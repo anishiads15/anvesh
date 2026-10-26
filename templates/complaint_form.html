@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}Register New Grievance — ANVESH AICTE Platform{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <div class="d-flex align-items-center gap-2 mb-1">
+    {% if g.current_user and g.current_user.is_complainant %}
+      <a href="{{ url_for('complaints.student_portal') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to My Grievances</a>
+    {% else %}
+      <a href="{{ url_for('complaints.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to Complaints</a>
+    {% endif %}
+    <h4 class="fw-bold mb-0 text-dark">Register Institutional Complaint</h4>
+  </div>
+  <p class="text-muted small mb-0">Submit a formal grievance record. The AI module will automatically evaluate taxonomy categorization and scan for duplicate incident overlaps.</p>
+</div>
+
+<div class="row g-4">
+  <!-- Form Column -->
+  <div class="col-lg-8">
+    <div class="gov-card">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Complaint Intake Form</h6>
+      </div>
+      <div class="gov-card-body">
+        <form method="POST" action="{{ url_for('complaints.create') }}" id="complaintForm" enctype="multipart/form-data">
+          <!-- Title -->
+          <div class="mb-3">
+            <label for="title" class="form-label fw-semibold">Complaint Title <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" id="title" name="title" placeholder="Brief summary of the issue (e.g. Mechanical lab machines non-functional)" value="{{ form_data.get('title', '') }}" required minlength="5">
+            <div class="form-text">Provide an accurate, descriptive summary. Minimum 5 characters.</div>
+          </div>
+
+          <!-- Description with Live Character Counter -->
+          <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <label for="description" class="form-label fw-semibold mb-0">Detailed Description <span class="text-danger">*</span></label>
+              <span class="small text-muted" id="charCountBadge">
+                <span id="charCount" class="fw-bold">0</span> / 150 non-whitespace chars (min)
+              </span>
+            </div>
+            <textarea class="form-control" id="description" name="description" rows="5" placeholder="Detail the operational malfunction, affected departments, duration, equipment IDs, or specific grievance context (minimum 150 non-whitespace characters)..." required minlength="15">{{ form_data.get('description', '') }}</textarea>
+            <div class="form-text d-flex justify-content-between">
+              <span>Provide comprehensive context for accurate semantic overlap detection and institutional inquiry.</span>
+              <span id="charCountFeedback" class="small fw-semibold"></span>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <!-- Institution -->
+            <div class="col-md-6">
+              <label for="institution_id" class="form-label fw-semibold">Target Institution <span class="text-danger">*</span></label>
+              {% if g.current_user.is_institution_admin %}
+                <input type="hidden" name="institution_id" value="{{ g.current_user.institution_id }}">
+                <input type="text" class="form-control" value="{{ g.current_user.institution.name }}" readonly disabled>
+                <div class="form-text">Restricted to your assigned institution.</div>
+              {% else %}
+                <select class="form-select" id="institution_id" name="institution_id" required>
+                  <option value="">Select Institution...</option>
+                  {% for inst in institutions %}
+                    <option value="{{ inst.id }}" {% if form_data.get('institution_id')|int == inst.id %}selected{% endif %}>
+                      {{ inst.name }} ({{ inst.code }}) - {{ inst.district }}, {{ inst.state }}
+                    </option>
+                  {% endfor %}
+                </select>
+              {% endif %}
+            </div>
+
+            <!-- Source Channel -->
+            <div class="col-md-6">
+              <label for="source_channel" class="form-label fw-semibold">Intake Channel <span class="text-danger">*</span></label>
+              <select class="form-select" id="source_channel" name="source_channel" required>
+                {% for src in sources %}
+                  <option value="{{ src }}" {% if form_data.get('source_channel') == src %}selected{% endif %}>{{ src }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="row g-3 mb-3">
+            <!-- Category with AI option -->
+            <div class="col-md-6">
+              <label for="category" class="form-label fw-semibold">Category Classification</label>
+              <select class="form-select" id="category" name="category">
+                <option value="AUTO" selected>&star; Auto-Categorize with AI (Recommended)</option>
+                {% for cat in categories %}
+                  <option value="{{ cat }}" {% if form_data.get('category') == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+              </select>
+              <div class="form-text">Select "Auto-Categorize" to let the natural language model classify this automatically.</div>
+            </div>
+
+            <!-- Subcategory -->
+            <div class="col-md-6">
+              <label for="subcategory" class="form-label fw-semibold">Subcategory (Optional)</label>
+              <input type="text" class="form-control" id="subcategory" name="subcategory" placeholder="Leave blank for automatic prediction" value="{{ form_data.get('subcategory', '') }}">
+            </div>
+          </div>
+
+          <div class="row g-3 mb-4">
+            <!-- Priority -->
+            <div class="col-md-4">
+              <label for="priority" class="form-label fw-semibold">Initial Severity / Priority</label>
+              <select class="form-select" id="priority" name="priority">
+                {% for pr in priorities %}
+                  <option value="{{ pr }}" {% if (form_data.get('priority') or 'Medium') == pr %}selected{% endif %}>{{ pr }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <!-- Supporting Reference -->
+            <div class="col-md-4">
+              <label for="supporting_reference" class="form-label fw-semibold">Docket ID (Optional)</label>
+              <input type="text" class="form-control" id="supporting_reference" name="supporting_reference" placeholder="e.g. LAB-2026-09" value="{{ form_data.get('supporting_reference', '') }}">
+            </div>
+
+            <!-- Supporting File Upload -->
+            <div class="col-md-4">
+              <label for="evidence_file" class="form-label fw-semibold">Evidence Document (PDF/DOC/DOCX)</label>
+              <input type="file" class="form-control" id="evidence_file" name="evidence_file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+              <div class="form-text" style="font-size: 0.72rem;">Only PDF, DOC, DOCX up to 5MB.</div>
+            </div>
+          </div>
+
+          <!-- Complainant & Confidentiality -->
+          <div class="row g-3 mb-4">
+            <div class="col-md-7">
+              <label for="complainant_name" class="form-label fw-semibold">Complainant / Grievant Name (Optional)</label>
+              <input type="text" class="form-control" id="complainant_name" name="complainant_name" placeholder="Name of student, faculty, or citizen submitting grievance" value="{{ form_data.get('complainant_name', '') }}">
+            </div>
+            <div class="col-md-5 d-flex align-items-center mt-4">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="is_confidential" name="is_confidential" value="1" {% if form_data.get('is_confidential') %}checked{% endif %}>
+                <label class="form-check-label fw-semibold small" for="is_confidential">
+                  <i class="bi bi-shield-lock-fill text-warning me-1"></i> Mark as Confidential
+                </label>
+                <div class="text-muted" style="font-size: 0.75rem;">Protects complainant personal details from public/dashboard exposure.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+            <button type="button" class="btn btn-outline-primary" id="btnPreviewAI">
+              <i class="bi bi-magic me-1"></i> Preview AI Categorization
+            </button>
+            <div class="d-flex gap-2">
+              <a href="{{ url_for('complaints.index') }}" class="btn btn-outline-secondary">Cancel</a>
+              <button type="submit" class="btn btn-gov-primary px-4">
+                <i class="bi bi-check-lg me-1"></i> Register Complaint &amp; Analyze Overlaps
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Real-Time AI Assistant Preview Column -->
+  <div class="col-lg-4">
+    <div class="gov-card border-primary border-opacity-25">
+      <div class="gov-card-header bg-light">
+        <h6 class="gov-card-title text-primary"><i class="bi bi-robot me-2"></i>AI Inference Engine Preview</h6>
+      </div>
+      <div class="gov-card-body">
+        <p class="small text-muted mb-3">
+          As you type the complaint title and description, the AI models analyze semantic domain prototypes to recommend classification and detect identical grievance topics.
+        </p>
+
+        <div id="aiPreviewBox" class="p-3 rounded bg-light border">
+          <div class="text-center text-muted py-3" id="aiPreviewPlaceholder">
+            <i class="bi bi-lightbulb fs-2 text-warning d-block mb-1"></i>
+            <span class="small">Enter title &amp; description, then click "Preview AI Categorization" to inspect semantic prediction.</span>
+          </div>
+
+          <div id="aiPreviewResults" style="display: none;">
+            <div class="mb-2">
+              <span class="small text-muted d-block">Predicted Category:</span>
+              <span class="fw-bold text-dark fs-6" id="predCategory">-</span>
+            </div>
+            <div class="mb-2">
+              <span class="small text-muted d-block">Predicted Subcategory:</span>
+              <span class="fw-semibold text-secondary" id="predSubcategory">-</span>
+            </div>
+            <div class="mb-2">
+              <span class="small text-muted d-block">Confidence &amp; Engine:</span>
+              <span class="badge bg-primary" id="predConfidence">-</span>
+              <div class="small text-muted mt-1" id="predEngine" style="font-size: 0.72rem;">-</div>
+            </div>
+            <div class="mb-2">
+              <span class="small text-muted d-block">Extracted Keywords:</span>
+              <div id="predKeywords" class="d-flex flex-wrap gap-1 mt-1"></div>
+            </div>
+            <div class="small text-secondary border-top pt-2 mt-2" id="predExplanation">
+              -
+            </div>
+          </div>
+        </div>
+
+        <div class="alert alert-info mt-3 small mb-0">
+          <i class="bi bi-info-circle me-1"></i>
+          <strong>Overlap Detection:</strong> Immediately upon submission, this complaint will be compared across all eligible complaints in the database using semantic vectors and keyword analysis.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const btnPreview = document.getElementById('btnPreviewAI');
+  const titleInput = document.getElementById('title');
+  const descInput = document.getElementById('description');
+
+  btnPreview.addEventListener('click', async function() {
+    const title = titleInput.value.trim();
+    const description = descInput.value.trim();
+
+    if (title.length < 3 && description.length < 5) {
+      alert('Please enter at least a brief title or description first.');
+      return;
+    }
+
+    btnPreview.disabled = true;
+    btnPreview.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Analyzing...';
+
+    try {
+      const response = await fetch("{{ url_for('complaints.preview_categorization') }}", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: title, description: description })
+      });
+      const data = await response.json();
+
+      document.getElementById('aiPreviewPlaceholder').style.display = 'none';
+      document.getElementById('aiPreviewResults').style.display = 'block';
+
+      document.getElementById('predCategory').innerText = data.category;
+      document.getElementById('predSubcategory').innerText = data.subcategory || 'General';
+      document.getElementById('predConfidence').innerText = (data.confidence_score * 100).toFixed(1) + '% (' + data.confidence_level + ')';
+      document.getElementById('predEngine').innerText = data.source;
+      document.getElementById('predExplanation').innerText = data.explanation;
+
+      const kwContainer = document.getElementById('predKeywords');
+      kwContainer.innerHTML = '';
+      (data.keywords || []).forEach(kw => {
+        const span = document.createElement('span');
+        span.className = 'badge bg-secondary';
+        span.innerText = kw;
+        kwContainer.appendChild(span);
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Could not connect to preview endpoint.');
+    } finally {
+      btnPreview.disabled = false;
+      btnPreview.innerHTML = '<i class="bi bi-magic me-1"></i> Preview AI Categorization';
+    }
+  });
+
+  // Live non-whitespace character counter for description
+  const descEl = document.getElementById('description');
+  const countEl = document.getElementById('charCount');
+  const feedEl = document.getElementById('charCountFeedback');
+  function updateCharCount() {
+    if (!descEl || !countEl) return;
+    const count = (descEl.value || '').replace(/\s+/g, '').length;
+    countEl.textContent = count;
+    if (count < 150) {
+      countEl.className = 'fw-bold text-danger';
+      if (feedEl) {
+        feedEl.textContent = `${150 - count} more non-whitespace characters required`;
+        feedEl.className = 'small fw-semibold text-danger';
+      }
+    } else {
+      countEl.className = 'fw-bold text-success';
+      if (feedEl) {
+        feedEl.textContent = 'Character length verified';
+        feedEl.className = 'small fw-semibold text-success';
+      }
+    }
+  }
+  if (descEl) {
+    descEl.addEventListener('input', updateCharCount);
+    updateCharCount();
+  }
+</script>
+{% endblock %}

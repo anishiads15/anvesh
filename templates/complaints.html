@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block title %}All Registered Complaints — AICTE Monitoring Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
+  <div>
+    <h4 class="fw-bold mb-1 text-dark">Institutional Complaints Master Directory</h4>
+    <p class="text-muted small mb-0">Central repository of grievance records across technical institutions with AI overlap indicators.</p>
+  </div>
+  {% if g.current_user and g.current_user.is_complainant %}
+  <a href="{{ url_for('complaints.create') }}" class="btn btn-gov-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i> Submit New Complaint
+  </a>
+  {% endif %}
+</div>
+
+<!-- Search & Filtering Control Card -->
+<div class="gov-card mb-4">
+  <div class="gov-card-body">
+    <form method="GET" action="{{ url_for('complaints.index') }}" class="row g-2">
+      <!-- Search Input -->
+      <div class="col-lg-4 col-md-6">
+        <label class="form-label small text-muted mb-1">Search Keywords or Reference</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+          <input type="text" name="q" class="form-control" placeholder="Search title, reference, or keywords..." value="{{ search_query or '' }}">
+        </div>
+      </div>
+
+      <!-- Institution Filter -->
+      {% if not g.current_user.is_institution_admin %}
+      <div class="col-lg-3 col-md-6">
+        <label class="form-label small text-muted mb-1">Institution</label>
+        <select name="institution_id" class="form-select form-select-sm">
+          <option value="">All Institutions</option>
+          {% for inst in institutions %}
+            <option value="{{ inst.id }}" {% if selected_institution == inst.id %}selected{% endif %}>
+              {{ inst.name }} ({{ inst.code }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <!-- Category Filter -->
+      <div class="col-lg-2 col-md-4">
+        <label class="form-label small text-muted mb-1">Category</label>
+        <select name="category" class="form-select form-select-sm">
+          <option value="">All Categories</option>
+          {% for cat in categories %}
+            <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Status Filter -->
+      <div class="col-lg-2 col-md-4">
+        <label class="form-label small text-muted mb-1">Status</label>
+        <select name="status" class="form-select form-select-sm">
+          <option value="">All Statuses</option>
+          {% for st in statuses %}
+            <option value="{{ st }}" {% if selected_status == st %}selected{% endif %}>{{ st }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Priority Filter -->
+      <div class="col-lg-2 col-md-4">
+        <label class="form-label small text-muted mb-1">Priority</label>
+        <select name="priority" class="form-select form-select-sm">
+          <option value="">All Priorities</option>
+          {% for pr in priorities %}
+            <option value="{{ pr }}" {% if selected_priority == pr %}selected{% endif %}>{{ pr }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Source Channel Filter -->
+      <div class="col-lg-2 col-md-4">
+        <label class="form-label small text-muted mb-1">Source Channel</label>
+        <select name="source" class="form-select form-select-sm">
+          <option value="">All Sources</option>
+          {% for src in sources %}
+            <option value="{{ src }}" {% if selected_source == src %}selected{% endif %}>{{ src }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Sort Filter -->
+      <div class="col-lg-2 col-md-4">
+        <label class="form-label small text-muted mb-1">Sort By</label>
+        <select name="sort_by" class="form-select form-select-sm">
+          <option value="date_desc" {% if sort_by == 'date_desc' %}selected{% endif %}>Date (Newest First)</option>
+          <option value="date_asc" {% if sort_by == 'date_asc' %}selected{% endif %}>Date (Oldest First)</option>
+          <option value="priority_desc" {% if sort_by == 'priority_desc' %}selected{% endif %}>Priority (Critical First)</option>
+        </select>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="col-lg-2 col-md-4 d-flex align-items-end gap-2">
+        <button type="submit" class="btn btn-gov-primary btn-sm w-100">
+          <i class="bi bi-funnel me-1"></i> Filter
+        </button>
+        <a href="{{ url_for('complaints.index') }}" class="btn btn-outline-secondary btn-sm" title="Reset Filters">
+          Reset
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Complaints Table Card -->
+<div class="gov-card">
+  <div class="gov-card-header flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <h6 class="gov-card-title mb-0">Records List</h6>
+      <span class="badge bg-light text-dark border"><span data-table-count>{{ total_count }}</span> complaints</span>
+    </div>
+    <!-- Instant Client-Side Filter Input (UI/UX Pro Max FilterBar) -->
+    <div class="d-flex align-items-center gap-2 ms-auto">
+      <div class="input-group input-group-sm" style="width: 240px;">
+        <span class="input-group-text bg-white border-end-0"><i class="bi bi-filter text-muted"></i></span>
+        <input type="text" class="form-control border-start-0" data-table-search="#complaintsMasterTable" placeholder="Instant filter in table..." aria-label="Instant filter">
+      </div>
+      <div class="small text-muted d-none d-sm-block">
+        Page {{ page }} of {{ total_pages }}
+      </div>
+    </div>
+  </div>
+
+  <div class="gov-card-body p-0">
+    {% if complaints %}
+      <div class="table-responsive">
+        <table class="gov-table mb-0" id="complaintsMasterTable">
+          <thead>
+            <tr>
+              <th>Reference &amp; Date</th>
+              <th>Institution</th>
+              <th>Title &amp; AI Overlap Signal</th>
+              <th>Category</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in complaints %}
+              <tr class="{% if c.highest_overlap_badge == 'STRONG_POTENTIAL' %}overlap-strong-highlight{% elif c.highest_overlap_badge == 'POSSIBLE_OVERLAP' %}overlap-possible-highlight{% endif %}">
+                <!-- Reference -->
+                <td style="white-space: nowrap;">
+                  <div class="d-flex align-items-center gap-1">
+                    <a href="{{ url_for('complaints.detail', complaint_id=c.id) }}" class="fw-bold text-dark text-decoration-none">
+                      {{ c.reference_number }}
+                    </a>
+                    <button type="button" class="btn-copy-chip" data-copy-text="{{ c.reference_number }}" title="Copy Reference ID" aria-label="Copy Reference ID">
+                      <i class="bi bi-clipboard"></i>
+                    </button>
+                  </div>
+                  <div class="small text-muted mt-1">
+                    {{ c.created_at.strftime('%d %b %Y') if c.created_at else '' }}
+                  </div>
+                </td>
+
+                <!-- Institution -->
+                <td style="max-width: 170px;">
+                  <div class="fw-semibold text-truncate" title="{{ c.institution.name }}">
+                    {{ c.institution.name }}
+                  </div>
+                  <div class="small text-muted">{{ c.institution.code }} &bull; {{ c.institution.district }}</div>
+                </td>
+
+                <!-- Title and Overlap Indicator -->
+                <td style="max-width: 280px;">
+                  <div class="fw-bold text-dark mb-1 text-truncate" title="{{ c.title }}">
+                    {{ c.title }}
+                    {% if c.is_confidential %}
+                      <span class="badge bg-warning bg-opacity-25 text-dark border border-warning ms-1" style="font-size: 0.65rem;" title="Confidential Complainant">
+                        <i class="bi bi-shield-lock-fill text-warning"></i> Confidential
+                      </span>
+                    {% endif %}
+                  </div>
+                  
+                  <!-- OVERLAP BADGES AS REQUIRED BY USER SPECIFICATION -->
+                  {% if c.highest_overlap_badge == 'STRONG_POTENTIAL' %}
+                    <span class="badge-strong-overlap" title="High semantic similarity with another registered complaint. Human deduplication required.">
+                      <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+                      STRONG POTENTIAL OVERLAP
+                    </span>
+                  {% elif c.highest_overlap_badge == 'POSSIBLE_OVERLAP' %}
+                    <span class="badge-possible-overlap" title="Contextual/keyword overlap detected. Review recommended.">
+                      <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                      POSSIBLE OVERLAP — REVIEW REQUIRED
+                    </span>
+                  {% elif c.highest_overlap_badge == 'CONFIRMED_RELATED' %}
+                    <span class="badge-confirmed-related" title="Verified by administrative reviewer as describing the same underlying issue.">
+                      <i class="bi bi-link-45deg"></i>
+                      HUMAN-CONFIRMED RELATED
+                    </span>
+                  {% else %}
+                    <span class="small text-muted" style="font-size: 0.75rem;">
+                      <i class="bi bi-shield-check text-muted me-1"></i>No overlap flagged
+                    </span>
+                  {% endif %}
+                </td>
+
+                <!-- Category -->
+                <td>
+                  <span class="badge bg-light text-dark border">{{ c.category }}</span>
+                  <div class="small text-muted" style="font-size: 0.72rem;">{{ c.source_channel }}</div>
+                </td>
+
+                <!-- Priority -->
+                <td>
+                  {% if c.priority == 'Critical' %}
+                    <span class="badge badge-priority-critical"><i class="bi bi-lightning-fill me-1"></i>Critical</span>
+                  {% elif c.priority == 'High' %}
+                    <span class="badge badge-priority-high">High</span>
+                  {% elif c.priority == 'Medium' %}
+                    <span class="badge badge-priority-medium">Medium</span>
+                  {% else %}
+                    <span class="badge badge-priority-low">Low</span>
+                  {% endif %}
+                </td>
+
+                <!-- Status -->
+                <td>
+                  {% if c.status == 'Open' %}
+                    <span class="badge badge-status-open"><i class="bi bi-circle-fill me-1" style="font-size: 0.5rem;"></i>Open</span>
+                  {% elif c.status == 'Under Review' %}
+                    <span class="badge badge-status-under-review"><i class="bi bi-hourglass me-1"></i>Under Review</span>
+                  {% elif c.status == 'Escalated' %}
+                    <span class="badge badge-status-escalated"><i class="bi bi-arrow-up-circle me-1"></i>Escalated</span>
+                  {% elif c.status == 'Resolved' %}
+                    <span class="badge badge-status-resolved"><i class="bi bi-check-circle me-1"></i>Resolved</span>
+                  {% else %}
+                    <span class="badge badge-status-closed">Closed</span>
+                  {% endif %}
+                </td>
+
+                <!-- Actions -->
+                <td class="text-end" style="white-space: nowrap;">
+                  <a href="{{ url_for('complaints.detail', complaint_id=c.id) }}" class="btn btn-sm btn-outline-primary" title="View Detailed Complaint">
+                    <i class="bi bi-eye"></i> Details
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination Footer -->
+      {% if total_pages > 1 %}
+        <div class="p-3 border-top d-flex justify-content-between align-items-center">
+          <div class="small text-muted">Showing page {{ page }} of {{ total_pages }}</div>
+          <nav>
+            <ul class="pagination pagination-sm mb-0">
+              <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('complaints.index', page=page-1, q=search_query, institution_id=selected_institution, category=selected_category, status=selected_status, priority=selected_priority, source=selected_source, sort_by=sort_by) }}">Previous</a>
+              </li>
+              {% for p in range(1, total_pages + 1) %}
+                <li class="page-item {% if page == p %}active{% endif %}">
+                  <a class="page-link" href="{{ url_for('complaints.index', page=p, q=search_query, institution_id=selected_institution, category=selected_category, status=selected_status, priority=selected_priority, source=selected_source, sort_by=sort_by) }}">{{ p }}</a>
+                </li>
+              {% endfor %}
+              <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+                <a class="page-link" href="{{ url_for('complaints.index', page=page+1, q=search_query, institution_id=selected_institution, category=selected_category, status=selected_status, priority=selected_priority, source=selected_source, sort_by=sort_by) }}">Next</a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      {% endif %}
+
+    {% else %}
+      <div class="p-5 text-center text-muted">
+        <i class="bi bi-inbox fs-2 text-secondary d-block mb-2"></i>
+        No complaints found matching the specified filters.
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

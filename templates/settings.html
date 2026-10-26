@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings &amp; AI Engine Configuration — AICTE Monitoring Portal{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h4 class="fw-bold mb-1 text-dark">System Configuration &amp; AI Diagnostics</h4>
+  <p class="text-muted small mb-0">Inspect AI model execution states, mathematical similarity weights, detection thresholds, and demonstration parameters.</p>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- AI Deduplication Engine Card -->
+  <div class="col-lg-6">
+    <div class="gov-card h-100">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title"><i class="bi bi-cpu me-2 text-primary"></i>Natural Language AI Inference Engine</h6>
+        {% if ai_status.is_transformer_active %}
+          <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Transformers Active</span>
+        {% else %}
+          <span class="badge bg-warning text-dark"><i class="bi bi-shield-shaded me-1"></i>TF-IDF Fallback Active</span>
+        {% endif %}
+      </div>
+      <div class="gov-card-body">
+        <div class="mb-3">
+          <span class="small text-muted d-block">Active Model / Engine:</span>
+          <span class="fw-bold text-dark fs-6">{{ ai_status.engine }}</span>
+        </div>
+
+        <div class="mb-3">
+          <span class="small text-muted d-block">Model Architecture:</span>
+          <code>{{ ai_status.model_name }}</code>
+          <p class="small text-muted mt-1">Generates 384-dimensional dense semantic vector representations for cosine similarity calculation across complaint titles and descriptions.</p>
+        </div>
+
+        <h6 class="fw-bold small text-muted text-uppercase mb-2">Mathematical Scoring Pipeline Weights</h6>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered mb-3">
+            <thead class="table-light">
+              <tr>
+                <th>Signal Component</th>
+                <th>Weight</th>
+                <th>Methodology</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Semantic Text Similarity</strong></td>
+                <td><span class="badge bg-primary">55%</span></td>
+                <td class="small">Cosine distance between dense transformer sentence vectors / n-gram TF-IDF matrices.</td>
+              </tr>
+              <tr>
+                <td><strong>Shared Issue Keywords</strong></td>
+                <td><span class="badge bg-info text-dark">20%</span></td>
+                <td class="small">Sorensen-Dice coefficient over domain-specific apparatus, infrastructure, and action verbs.</td>
+              </tr>
+              <tr>
+                <td><strong>Category Compatibility</strong></td>
+                <td><span class="badge bg-secondary">15%</span></td>
+                <td class="small">Domain hierarchy compatibility matrix (1.0 exact, 0.4 cross-domain, 0.0 incompatible).</td>
+              </tr>
+              <tr>
+                <td><strong>Contextual Similarity</strong></td>
+                <td><span class="badge bg-secondary">10%</span></td>
+                <td class="small">Campus identity (+0.50), specific facility matching (+0.30), and temporal proximity (+0.20).</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="alert alert-secondary small mb-0">
+          <i class="bi bi-shield-exclamation me-1"></i>
+          <strong>Contradictory Topic Filter:</strong> Unrelated subjects (e.g. drinking water sanitation vs laboratory mechanical apparatus) trigger an automatic suppression cap (&le; 0.32) to strictly eliminate false positives between distinct grievances at the same campus.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlap Decision Thresholds & Canonical Handling -->
+  <div class="col-lg-6">
+    <div class="gov-card h-100">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title"><i class="bi bi-sliders me-2 text-primary"></i>Decision Thresholds &amp; Deduplication Rules</h6>
+      </div>
+      <div class="gov-card-body">
+        <div class="d-flex align-items-center justify-content-between p-3 rounded mb-3" style="background-color: var(--strong-overlap-bg); border-left: 4px solid var(--strong-overlap-border);">
+          <div>
+            <div class="fw-bold text-danger">Strong Potential Overlap</div>
+            <div class="small text-muted">Composite Score &ge; {{ ai_status.strong_threshold }}</div>
+          </div>
+          <span class="badge bg-danger fs-6">&ge; 80%</span>
+        </div>
+
+        <div class="d-flex align-items-center justify-content-between p-3 rounded mb-3" style="background-color: var(--possible-overlap-bg); border-left: 4px solid var(--possible-overlap-border);">
+          <div>
+            <div class="fw-bold text-warning text-dark">Possible Overlap — Review Required</div>
+            <div class="small text-muted">{{ ai_status.possible_threshold }} &le; Composite Score &lt; {{ ai_status.strong_threshold }}</div>
+          </div>
+          <span class="badge bg-warning text-dark fs-6">50% &ndash; 79%</span>
+        </div>
+
+        <div class="d-flex align-items-center justify-content-between p-3 rounded mb-3 bg-light border-start border-4 border-secondary">
+          <div>
+            <div class="fw-bold text-secondary">No Overlap Flag</div>
+            <div class="small text-muted">Composite Score &lt; {{ ai_status.possible_threshold }}</div>
+          </div>
+          <span class="badge bg-secondary fs-6">&lt; 50%</span>
+        </div>
+
+        <h6 class="fw-bold small text-muted text-uppercase mb-2">Canonical Pair Integrity</h6>
+        <p class="small text-muted">
+          Complaint pairs are stored with strict canonical ordering (<code>first_id &lt; second_id</code>) and a database unique constraint <code>uq_complaint_pair</code> to prevent redundant duplicate relationships.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Database & System Stats -->
+<div class="gov-card">
+  <div class="gov-card-header d-flex justify-content-between align-items-center">
+    <h6 class="gov-card-title mb-0"><i class="bi bi-database me-2 text-primary"></i>System Diagnostics &amp; Environment Statistics</h6>
+    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
+      <i class="bi bi-check-circle me-1"></i> Database Synchronized
+    </span>
+  </div>
+  <div class="gov-card-body">
+    <div class="row g-3">
+      <div class="col-md-2 col-sm-4">
+        <div class="small text-muted">Complaints In Storage</div>
+        <h4 class="fw-bold text-dark mb-0">{{ stats.total_complaints }}</h4>
+        <span class="text-secondary small" style="font-size: 0.72rem;">Persisted Records</span>
+      </div>
+      <div class="col-md-2 col-sm-4">
+        <div class="small text-muted">Registered Institutions</div>
+        <h4 class="fw-bold text-dark mb-0">{{ stats.total_institutions }}</h4>
+        <span class="text-secondary small" style="font-size: 0.72rem;">AICTE Approved</span>
+      </div>
+      <div class="col-md-3 col-sm-4">
+        <div class="small text-muted">Unique Stored Overlaps</div>
+        <h4 class="fw-bold text-info mb-0">{{ stats.unique_stored_overlaps }}</h4>
+        <span class="text-secondary small" style="font-size: 0.72rem;">Canonical Relationships</span>
+      </div>
+      <div class="col-md-2 col-sm-6">
+        <div class="small text-muted">Pair Evaluations</div>
+        <h4 class="fw-bold text-dark mb-0">{{ stats.total_evaluations }}</h4>
+        <span class="text-secondary small" style="font-size: 0.72rem;">Combinatorial Scans</span>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="small text-muted">Audit Records</div>
+        <h4 class="fw-bold text-dark mb-0">{{ stats.total_audit_events }}</h4>
+        <span class="text-secondary small" style="font-size: 0.72rem;">Immutable Events</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

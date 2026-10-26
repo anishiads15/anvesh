@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}AICTE Inter-Bureau Grievance Intelligence Platform (ANVESH){% endblock %}</title>
+  
+  <!-- Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <!-- Custom WealthWise-Inspired Stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <!-- UI/UX Pro Max Design Intelligence Script (Pre-paint theme initialization) -->
+  <script src="{{ url_for('static', filename='js/ui-ux-pro-max.js') }}"></script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <div class="app-container">
+    <!-- Slim Persistent Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon-box">
+          <i class="bi bi-shield-check"></i>
+        </div>
+        <div>
+          <div class="brand-title">ANVESH</div>
+          <div class="brand-subtitle">AICTE Grievance Platform</div>
+        </div>
+      </div>
+
+      <ul class="sidebar-menu">
+        {% if g.current_user and g.current_user.is_complainant %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint in ['complaints.student_portal', 'complaints.student_detail'] %}active{% endif %}" href="{{ url_for('complaints.student_portal') }}">
+              <i class="bi bi-journal-text"></i>
+              <span>My Grievances</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'complaints.create' %}active{% endif %}" href="{{ url_for('complaints.create') }}">
+              <i class="bi bi-plus-circle"></i>
+              <span>Register Grievance</span>
+            </a>
+          </li>
+        {% else %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'dashboard.index' %}active{% endif %}" href="{{ url_for('dashboard.index') }}">
+              <i class="bi bi-grid-1x2"></i>
+              <span>Dashboard</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'complaints.index' %}active{% endif %}" href="{{ url_for('complaints.index') }}">
+              <i class="bi bi-inbox"></i>
+              <span>{% if g.current_user and g.current_user.is_institution_admin %}Campus Grievances{% else %}All Grievances{% endif %}</span>
+            </a>
+          </li>
+          {% if g.current_user and (g.current_user.is_super_admin or g.current_user.is_aicte_officer) %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'overlaps.index' %}active{% endif %}" href="{{ url_for('overlaps.index') }}">
+              <i class="bi bi-diagram-3"></i>
+              <span>Overlap Intelligence</span>
+            </a>
+          </li>
+          {% endif %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint in ['complaints.review_queues'] %}active{% endif %}" href="{{ url_for('complaints.review_queues') }}">
+              <i class="bi bi-layers"></i>
+              <span>Review Queues</span>
+            </a>
+          </li>
+          {% if g.current_user and not g.current_user.is_institution_admin %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint in ['institutions.index', 'institutions.detail'] %}active{% endif %}" href="{{ url_for('institutions.index') }}">
+              <i class="bi bi-building"></i>
+              <span>Institutions</span>
+            </a>
+          </li>
+          {% endif %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'reports.index' %}active{% endif %}" href="{{ url_for('reports.index') }}">
+              <i class="bi bi-graph-up-arrow"></i>
+              <span>Analytics &amp; SLA</span>
+            </a>
+          </li>
+          {% if g.current_user and (g.current_user.is_super_admin or g.current_user.is_reviewer or g.current_user.is_auditor) %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'settings.audit_log' %}active{% endif %}" href="{{ url_for('settings.audit_log') }}">
+              <i class="bi bi-clock-history"></i>
+              <span>Audit Log Scrutiny</span>
+            </a>
+          </li>
+          {% endif %}
+          {% if g.current_user and (g.current_user.is_super_admin or g.current_user.is_reviewer) and not g.current_user.is_auditor %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'settings.settings' %}active{% endif %}" href="{{ url_for('settings.settings') }}">
+              <i class="bi bi-gear"></i>
+              <span>Settings</span>
+            </a>
+          </li>
+          {% endif %}
+        {% endif %}
+      </ul>
+
+      <!-- AICTE Advisory Card -->
+      {% if g.current_user and (g.current_user.is_super_admin or g.current_user.is_aicte_officer) %}
+      <div class="sidebar-advisory-card">
+        <div class="sidebar-advisory-badge">
+          <i class="bi bi-shield-shaded"></i> AICTE Advisory
+        </div>
+        <div class="sidebar-advisory-text">
+          <strong>Hybrid Overlap AI:</strong> Cross-bureau overlap pairs flagged for human review. Zero auto-merging.
+        </div>
+        <a href="{{ url_for('overlaps.index') }}" class="small text-info text-decoration-none fw-semibold">
+          Inspect Queue &rarr;
+        </a>
+      </div>
+      {% endif %}
+
+      <div class="sidebar-footer p-3 border-top border-secondary border-opacity-25 text-white-50 small">
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-success rounded-circle p-1"></span>
+          <span>ANVESH Grievance Intelligence Platform</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+      <!-- Top Header -->
+      <header class="top-header">
+        <div class="d-flex align-items-center">
+          <!-- Mobile Sidebar Toggle -->
+          <button class="btn btn-sm btn-outline-secondary d-lg-none me-2" id="mobileSidebarToggle" type="button" aria-label="Toggle navigation">
+            <i class="bi bi-list fs-5"></i>
+          </button>
+
+          <!-- Global Search Bar with Keyboard Hint -->
+          <div class="header-search">
+            <form method="GET" action="{{ url_for('complaints.index') }}">
+              <i class="bi bi-search search-icon"></i>
+              <input type="text" name="search" placeholder="Search complaints, USN, institutions..." value="{{ request.args.get('search', '') }}" aria-label="Search grievances">
+              <span class="search-kbd" title="Press '/' anywhere to search">/</span>
+            </form>
+          </div>
+        </div>
+
+        <div class="header-user-section">
+          <!-- Quick Dark Mode Toggle (Imported from UI UX Pro Max) -->
+          <button type="button" class="header-icon-btn" id="uupmThemeToggleBtn" title="Toggle Light/Dark Theme (Ctrl+J)" aria-label="Toggle Theme">
+            <i class="bi bi-moon-stars-fill text-secondary"></i>
+          </button>
+
+          <!-- UI/UX Pro Max Design Controls Drawer Trigger -->
+          <button type="button" class="header-icon-btn" data-bs-toggle="offcanvas" data-bs-target="#uupmDesignDrawer" title="UI/UX Pro Max Design System Controls (Ctrl+Shift+D)" aria-label="Design System Controls">
+            <i class="bi bi-palette2 text-primary"></i>
+          </button>
+
+          <!-- Notification Bell -->
+          <a href="#" class="header-icon-btn position-relative" data-bs-toggle="modal" data-bs-target="#notificationModal" title="View Recent Notifications" aria-label="Notifications">
+            <i class="bi bi-bell"></i>
+            {% if unread_notifications_count and unread_notifications_count > 0 %}
+              <span class="notification-badge">{{ unread_notifications_count if unread_notifications_count < 100 else '99+' }}</span>
+            {% endif %}
+          </a>
+
+          <!-- User Profile Badge -->
+          {% if g.current_user %}
+            <div class="user-profile-badge">
+              <div class="user-avatar">
+                {{ g.current_user.display_name[0] | upper }}
+              </div>
+              <div class="d-none d-sm-block">
+                <div class="small fw-bold lh-1 text-truncate" style="max-width: 130px;">{{ g.current_user.display_name }}</div>
+                <div class="text-muted d-flex align-items-center gap-1 mt-1" style="font-size: 0.72rem;">
+                  <span>{{ g.current_user.role_title() }}</span>
+                  {% if g.current_user.is_auditor %}
+                    <span class="badge bg-warning text-dark py-0 px-1" style="font-size: 0.65rem;">Read-Only</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            <a href="{{ url_for('auth.logout') }}" class="btn btn-sm btn-outline-danger" title="Sign out securely" aria-label="Sign Out">
+              <i class="bi bi-box-arrow-right"></i>
+            </a>
+          {% else %}
+            <a href="{{ url_for('auth.login') }}" class="btn btn-sm btn-gov-primary">Sign In</a>
+          {% endif %}
+        </div>
+      </header>
+
+      <!-- Flash Message Container -->
+      <div class="container-fluid px-4 pt-3">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
+                <i class="bi {% if category == 'success' %}bi-check-circle{% elif category == 'danger' %}bi-exclamation-triangle{% elif category == 'warning' %}bi-exclamation-circle{% else %}bi-info-circle{% endif %} me-2"></i>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+      </div>
+
+      <!-- Main Body View -->
+      <main class="content-wrapper">
+        {% block content %}{% endblock %}
+      </main>
+
+      <!-- Footer -->
+      <footer class="bg-white border-top py-3 px-4 small text-muted text-center">
+        All India Council for Technical Education (AICTE) &bull; ANVESH &bull; Analytics-Driven Network for Verifying, Evaluating, and Synchronizing Higher-Education Grievances &copy; 2026.
+      </footer>
+    </div>
+  </div>
+
+  <!-- Notifications Modal -->
+  <div class="modal fade" id="notificationModal" tabindex="-1" aria-labelledby="notificationModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h6 class="modal-title fw-bold" id="notificationModalLabel">
+            <i class="bi bi-bell me-2 text-primary"></i>System &amp; Grievance Notifications
+          </h6>
+          <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="btnMarkAllRead">
+              <i class="bi bi-check2-all me-1"></i> Mark All Read
+            </button>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+        </div>
+        <div class="modal-body p-0" id="notificationModalBody">
+          <div class="p-3 text-center text-muted">
+            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div> Loading notifications...
+          </div>
+        </div>
+        <div class="modal-footer py-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- UI/UX PRO MAX DESIGN SYSTEM CONTROLS (Offcanvas Drawer)  -->
+  <!-- ======================================================== -->
+  <div class="offcanvas offcanvas-end offcanvas-design-drawer" tabindex="-1" id="uupmDesignDrawer" aria-labelledby="uupmDesignDrawerLabel" style="width: 380px;">
+    <div class="offcanvas-header border-bottom py-3">
+      <div class="d-flex align-items-center gap-2">
+        <div class="brand-icon-box" style="width: 32px; height: 32px; font-size: 1rem; border-radius: 8px;">
+          <i class="bi bi-palette-fill"></i>
+        </div>
+        <div>
+          <h6 class="offcanvas-title fw-bold mb-0" id="uupmDesignDrawerLabel">UI/UX Pro Max Controls</h6>
+          <div class="small text-muted" style="font-size: 0.72rem;">Live Design Intelligence &amp; Token Customizer</div>
+        </div>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body p-4">
+      <!-- 1. Color Scheme (Theme Mode) -->
+      <div class="mb-4">
+        <label class="form-label small fw-bold text-uppercase tracking-wider text-muted mb-2">
+          <i class="bi bi-circle-half me-1"></i> Theme Color Scheme
+        </label>
+        <div class="design-choice-group">
+          <button type="button" class="design-choice-btn" data-theme-choice="light">
+            <i class="bi bi-sun-fill text-warning"></i> Light
+          </button>
+          <button type="button" class="design-choice-btn" data-theme-choice="dark">
+            <i class="bi bi-moon-stars-fill text-info"></i> Dark
+          </button>
+          <button type="button" class="design-choice-btn" data-theme-choice="system">
+            <i class="bi bi-display"></i> Auto / System
+          </button>
+        </div>
+        <div class="form-text small mt-1">Shortcut: <code>Ctrl + J</code> toggles Dark Mode instantly.</div>
+      </div>
+
+      <!-- 2. Accent Color Palette -->
+      <div class="mb-4">
+        <label class="form-label small fw-bold text-uppercase tracking-wider text-muted mb-2">
+          <i class="bi bi-brush-fill me-1"></i> Brand Accent Palette
+        </label>
+        <div class="design-choice-group">
+          <button type="button" class="design-choice-btn" data-accent-choice="blue">
+            <span class="rounded-circle p-1" style="background: #1d4ed8; width: 12px; height: 12px; display: inline-block;"></span> AICTE Blue
+          </button>
+          <button type="button" class="design-choice-btn" data-accent-choice="emerald">
+            <span class="rounded-circle p-1" style="background: #10b981; width: 12px; height: 12px; display: inline-block;"></span> Cyber Emerald
+          </button>
+          <button type="button" class="design-choice-btn" data-accent-choice="indigo">
+            <span class="rounded-circle p-1" style="background: #4f46e5; width: 12px; height: 12px; display: inline-block;"></span> Royal Indigo
+          </button>
+          <button type="button" class="design-choice-btn" data-accent-choice="amber">
+            <span class="rounded-circle p-1" style="background: #f59e0b; width: 12px; height: 12px; display: inline-block;"></span> Saffron Amber
+          </button>
+          <button type="button" class="design-choice-btn" data-accent-choice="rose">
+            <span class="rounded-circle p-1" style="background: #f43f5e; width: 12px; height: 12px; display: inline-block;"></span> Crimson Rose
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. Corner Radius Token -->
+      <div class="mb-4">
+        <label class="form-label small fw-bold text-uppercase tracking-wider text-muted mb-2">
+          <i class="bi bi-bounding-box-circles me-1"></i> Surface Corner Radius
+        </label>
+        <div class="design-choice-group">
+          <button type="button" class="design-choice-btn" data-radius-choice="6">
+            Sharp (6px)
+          </button>
+          <button type="button" class="design-choice-btn" data-radius-choice="18">
+            Modern (18px)
+          </button>
+          <button type="button" class="design-choice-btn" data-radius-choice="28">
+            Smooth Pill (28px)
+          </button>
+        </div>
+      </div>
+
+      <!-- 4. Interface Density -->
+      <div class="mb-4">
+        <label class="form-label small fw-bold text-uppercase tracking-wider text-muted mb-2">
+          <i class="bi bi-distribute-vertical me-1"></i> Interface Density
+        </label>
+        <div class="design-choice-group">
+          <button type="button" class="design-choice-btn" data-density-choice="comfortable">
+            <i class="bi bi-arrows-expand me-1"></i> Comfortable (Default)
+          </button>
+          <button type="button" class="design-choice-btn" data-density-choice="compact">
+            <i class="bi bi-arrows-collapse me-1"></i> Compact (Auditor View)
+          </button>
+        </div>
+      </div>
+
+      <!-- 5. WCAG Accessibility Contrast -->
+      <div class="mb-4">
+        <label class="form-label small fw-bold text-uppercase tracking-wider text-muted mb-2">
+          <i class="bi bi-eye-fill me-1"></i> Accessibility &amp; Contrast
+        </label>
+        <div class="design-choice-group">
+          <button type="button" class="design-choice-btn" data-contrast-choice="standard">
+            Standard (WCAG AA)
+          </button>
+          <button type="button" class="design-choice-btn" data-contrast-choice="high">
+            High Contrast (WCAG AAA)
+          </button>
+        </div>
+      </div>
+
+      <!-- Summary Info Card -->
+      <div class="p-3 rounded-3 bg-light border text-muted small mt-4">
+        <div class="fw-bold text-dark mb-1"><i class="bi bi-info-circle text-primary me-1"></i> UI/UX Pro Max Engine</div>
+        All styling tokens, contrast modes, and active presets are saved to your browser session and persist seamlessly across all tabs without altering backend models.
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Toast Notification Container -->
+  <div id="uupmToastContainer" class="toast-container" aria-live="polite"></div>
+
+  <!-- Bootstrap 5 Bundle JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Mobile Sidebar Toggle
+    const mobileToggle = document.getElementById('mobileSidebarToggle');
+    if (mobileToggle) {
+      mobileToggle.addEventListener('click', function () {
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar) sidebar.classList.toggle('show-mobile');
+      });
+    }
+
+    // Live Notifications Loader
+    function loadNotifications() {
+      fetch('/api/notifications?per_page=20')
+        .then(response => response.json())
+        .then(data => {
+          const container = document.getElementById('notificationModalBody');
+          const notifs = data.notifications || data.items || [];
+          if (!notifs || notifs.length === 0) {
+            container.innerHTML = '<div class="p-4 text-center text-muted"><i class="bi bi-check-circle fs-3 text-success d-block mb-2"></i>No unread notifications at this time.</div>';
+            return;
+          }
+          let html = '<div class="list-group list-group-flush">';
+          notifs.forEach(n => {
+            html += `
+              <div class="list-group-item p-3 ${n.is_read ? '' : 'bg-light'}">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                  <span class="badge ${n.is_read ? 'bg-secondary' : 'bg-primary'}">${n.event_type || n.type || 'Update'}</span>
+                  <div class="d-flex align-items-center gap-2">
+                    <small class="text-muted" style="font-size: 0.72rem;">${n.created_at || ''}</small>
+                    ${!n.is_read ? `<button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1" style="font-size: 0.65rem;" onclick="markSingleRead(${n.id}, this)">Mark Read</button>` : ''}
+                  </div>
+                </div>
+                <div class="small fw-semibold text-dark mb-1">${n.title}</div>
+                <div class="text-secondary small mb-1">${n.message}</div>
+                ${n.complaint_id ? `<a href="/complaints/${n.complaint_id}" class="small text-primary text-decoration-none fw-semibold">View Grievance &rarr;</a>` : ''}
+              </div>
+            `;
+          });
+          html += '</div>';
+          container.innerHTML = html;
+        })
+        .catch(err => {
+          document.getElementById('notificationModalBody').innerHTML = '<div class="p-3 text-danger text-center small">Could not load notifications.</div>';
+        });
+    }
+
+    function markSingleRead(id, btn) {
+      fetch('/api/notifications/' + id + '/read', { method: 'POST' })
+        .then(r => r.json())
+        .then(() => {
+          if (btn) {
+            const item = btn.closest('.list-group-item');
+            if (item) item.classList.remove('bg-light');
+            btn.remove();
+          }
+          const badge = document.querySelector('.notification-badge');
+          if (badge) {
+            const count = parseInt(badge.textContent, 10);
+            if (!isNaN(count) && count > 1) {
+              badge.textContent = count - 1;
+            } else {
+              badge.remove();
+            }
+          }
+        });
+    }
+
+    const btnMarkAll = document.getElementById('btnMarkAllRead');
+    if (btnMarkAll) {
+      btnMarkAll.addEventListener('click', function() {
+        fetch('/api/notifications/mark-all-read', { method: 'POST' })
+          .then(r => r.json())
+          .then(() => {
+            loadNotifications();
+            const badge = document.querySelector('.notification-badge');
+            if (badge) badge.remove();
+          });
+      });
+    }
+
+    document.getElementById('notificationModal').addEventListener('show.bs.modal', loadNotifications);
+  </script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,999 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics &amp; Overlap Analysis Reports — AICTE Monitoring Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
+  <div>
+    <h4 class="fw-bold mb-1 text-dark">Analytics, Overlap Patterns &amp; Recurrence Monitoring</h4>
+    <p class="text-muted small mb-0">Multi-institutional duplicate pattern analysis, network relationships, category recurring clusters, and resolution recurrence verification.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('reports.export_complaints_csv', institution_id=selected_institution) }}" class="btn btn-outline-success btn-sm">
+      <i class="bi bi-file-earmark-spreadsheet me-1"></i> Export Complaints CSV
+    </a>
+    <a href="{{ url_for('reports.export_overlaps_csv', institution_id=selected_institution) }}" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-file-earmark-diff me-1"></i> Export Overlap Analysis CSV
+    </a>
+  </div>
+</div>
+
+<div class="alert alert-light border small text-muted mb-4 d-flex align-items-center justify-content-between">
+  <div>
+    <i class="bi bi-info-circle-fill text-primary me-2"></i>
+    <strong>Active Multi-Institution Analysis Dataset:</strong> Visualizations dynamically reflect {{ metrics.total_complaints }} complaints across 8 registered institutions and {{ overlap_stats.total_overlaps }} algorithmic overlap relationships.
+  </div>
+  <span class="badge bg-secondary">Calculated from Database</span>
+</div>
+
+<!-- AI Overlap Review & Deduplication Performance Cards -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div>
+        <div class="stat-value text-primary">{{ overlap_stats.total_overlaps }}</div>
+        <div class="stat-label">Total Overlaps Detected</div>
+      </div>
+      <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-diagram-3"></i></div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div>
+        <div class="stat-value text-danger">{{ overlap_stats.strong_potential_total }}</div>
+        <div class="stat-label">Strong Overlaps (&ge; 80%)</div>
+      </div>
+      <div class="stat-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-exclamation-octagon"></i></div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div>
+        <div class="stat-value text-warning">{{ overlap_stats.possible_overlap_total }}</div>
+        <div class="stat-label">Possible Overlaps (50%–79%)</div>
+      </div>
+      <div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-exclamation-triangle"></i></div>
+    </div>
+  </div>
+
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div>
+        <div class="stat-value text-success">{{ overlap_stats.confirmed_related }}</div>
+        <div class="stat-label">Human-Confirmed Related</div>
+      </div>
+      <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-check-circle"></i></div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 1: Overlap Trend & Institution-Wise Overlap Comparison -->
+<div class="row g-4 mb-4">
+  <!-- Graph A: Complaint Overlap Trend -->
+  <div class="col-lg-6">
+    <div class="gov-card h-100">
+      <div class="gov-card-header d-flex justify-content-between align-items-center">
+        <h6 class="gov-card-title mb-0">
+          <i class="bi bi-graph-up me-2 text-primary"></i>A. Complaint Overlap Trend (Past 90 Days)
+        </h6>
+        <span class="badge bg-light text-dark border">Bi-Weekly Submission Dates</span>
+      </div>
+      <div class="gov-card-body">
+        <p class="small text-muted mb-3">
+          Chronological trajectory of strong overlaps and possible overlaps identified over time, highlighting whether duplicate grievances are accelerating or diminishing.
+        </p>
+        <div style="height: 290px;">
+          <canvas id="overlapTrendChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Graph C: Institution-wise Overlap Comparison -->
+  <div class="col-lg-6">
+    <div class="gov-card h-100">
+      <div class="gov-card-header d-flex justify-content-between align-items-center">
+        <h6 class="gov-card-title mb-0">
+          <i class="bi bi-bar-chart-steps me-2 text-primary"></i>C. Institution-wise Overlap Comparison
+        </h6>
+        <span class="badge bg-light text-dark border">Same-Inst vs Cross-Inst</span>
+      </div>
+      <div class="gov-card-body">
+        <p class="small text-muted mb-3">
+          Compares overlap distribution across all registered colleges. Clearly distinguishes local campus duplicate incidents from cross-institutional shared patterns.
+        </p>
+        <div style="height: 290px;">
+          <canvas id="institutionOverlapChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 2: Graph B - Complaint Relationship Graph (Interactive Node-Link Network) -->
+<div class="row g-4 mb-4">
+  <div class="col-12">
+    <div class="gov-card">
+      <div class="gov-card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-share me-1 text-primary"></i>
+          <h6 class="gov-card-title mb-0">B. Complaint Relationship Network Graph</h6>
+          <span class="badge bg-light text-dark border">{{ network_graph.total_nodes }} Complaint Nodes &bull; {{ network_graph.total_edges }} Overlap Edges</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-danger text-white"><i class="bi bi-dash-lg me-1"></i>Strong Overlap (&ge;80%)</span>
+          <span class="badge bg-warning text-dark"><i class="bi bi-dash-lg me-1"></i>Possible Overlap (50-79%)</span>
+          <span class="badge bg-info text-dark"><i class="bi bi-bounding-box me-1"></i>Cross-Institution Link</span>
+          <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" id="btnResetGraph" title="Reset layout and physics">
+            <i class="bi bi-arrow-counterclockwise me-1"></i> Reset Network
+          </button>
+        </div>
+      </div>
+      <div class="gov-card-body p-0">
+        <div class="row g-0">
+          <!-- Interactive HTML5 Canvas Container -->
+          <div class="col-lg-8 border-end position-relative" style="min-height: 480px; background-color: #fafbfc;">
+            <canvas id="networkCanvas" style="width: 100%; height: 480px; display: block; cursor: grab;"></canvas>
+            <div class="position-absolute bottom-0 start-0 p-2 small text-muted bg-white bg-opacity-75 border-top border-end rounded-top">
+              <i class="bi bi-hand-index-thumb me-1"></i> Click any complaint node or edge line to inspect similarity scores and matched context. Drag to rearrange.
+            </div>
+          </div>
+
+          <!-- Network Inspector Side Panel -->
+          <div class="col-lg-4 p-3 d-flex flex-column" style="max-height: 480px; overflow-y: auto; background-color: #ffffff;">
+            <h6 class="fw-bold text-dark border-bottom pb-2 mb-2 d-flex align-items-center justify-content-between">
+              <span><i class="bi bi-info-circle me-1 text-primary"></i>Relationship Inspector</span>
+              <span class="badge bg-light text-muted border" id="inspectorBadge">Select Node</span>
+            </h6>
+            
+            <div id="inspectorContent">
+              <div class="text-center py-5 text-muted">
+                <i class="bi bi-diagram-3 fs-1 text-secondary opacity-50 d-block mb-2"></i>
+                <div class="fw-semibold">No Complaint Selected</div>
+                <div class="small">Click on any complaint node in the network to view linked grievances, institution coordinates, and similarity scores.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 3: Graph D - Complaint Category Overlap & Graph E - Resolution & Recurrence Analysis -->
+<div class="row g-4 mb-4">
+  <!-- Graph D: Complaint Category Overlap -->
+  <div class="col-lg-6">
+    <div class="gov-card h-100">
+      <div class="gov-card-header d-flex justify-content-between align-items-center">
+        <h6 class="gov-card-title mb-0">
+          <i class="bi bi-pie-chart me-2 text-primary"></i>D. Complaint Category Overlap Analysis
+        </h6>
+        <span class="badge bg-light text-dark border">Recurring Pattern Focus</span>
+      </div>
+      <div class="gov-card-body">
+        <p class="small text-muted mb-3">
+          Quantifies categories generating the highest density of duplicate complaints (e.g. Laboratory Infrastructure, Hostel Accommodation, Scholarships, and Ragging).
+        </p>
+        <div style="height: 310px;">
+          <canvas id="categoryOverlapChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Graph E: Resolution and Recurrence Analysis -->
+  <div class="col-lg-6">
+    <div class="gov-card h-100">
+      <div class="gov-card-header d-flex justify-content-between align-items-center">
+        <h6 class="gov-card-title mb-0">
+          <i class="bi bi-arrow-repeat me-2 text-primary"></i>E. Resolution &amp; Recurrence Analysis
+        </h6>
+        <span class="badge bg-light text-dark border">Post-Resolution Audit</span>
+      </div>
+      <div class="gov-card-body">
+        <p class="small text-muted mb-3">
+          Evaluates permanent vs recurring resolutions. Detects new complaints submitted after an earlier identical issue was officially marked resolved.
+        </p>
+
+        <!-- Recurrence Metric Cards -->
+        <div class="row g-2 mb-3">
+          <div class="col-sm-3">
+            <div class="p-2 border rounded text-center bg-light">
+              <div class="small text-muted" style="font-size: 0.72rem;">Total Resolved</div>
+              <div class="fw-bold text-dark fs-5">{{ recurrence_analysis.total_resolved }}</div>
+            </div>
+          </div>
+          <div class="col-sm-3">
+            <div class="p-2 border rounded text-center bg-light">
+              <div class="small text-muted" style="font-size: 0.72rem;">Clean / Permanent</div>
+              <div class="fw-bold text-success fs-5">{{ recurrence_analysis.clean_resolved }}</div>
+            </div>
+          </div>
+          <div class="col-sm-3">
+            <div class="p-2 border rounded text-center bg-light">
+              <div class="small text-muted" style="font-size: 0.72rem;">Suspected Recurrence</div>
+              <div class="fw-bold text-warning fs-5">{{ recurrence_analysis.suspected_count }}</div>
+            </div>
+          </div>
+          <div class="col-sm-3">
+            <div class="p-2 border rounded text-center bg-light">
+              <div class="small text-muted" style="font-size: 0.72rem;">Confirmed Recurrent</div>
+              <div class="fw-bold text-danger fs-5">{{ recurrence_analysis.confirmed_count }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recurrence Chart Container -->
+        <div style="height: 200px;">
+          <canvas id="recurrenceDonutChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detailed Recurrence Audit Table (Supporting Graph E) -->
+<div class="gov-card mb-4">
+  <div class="gov-card-header d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-clock-history text-primary"></i>
+      <h6 class="gov-card-title mb-0">Verified Recurring Grievances Audit</h6>
+    </div>
+    <span class="badge bg-light text-dark border">{{ recurrence_analysis.recurrence_items | length }} recurrent cases identified</span>
+  </div>
+  <div class="gov-card-body p-0">
+    {% if recurrence_analysis.recurrence_items %}
+      <div class="table-responsive">
+        <table class="gov-table mb-0">
+          <thead>
+            <tr>
+              <th>Prior Resolved Complaint</th>
+              <th>Resolution Statement &amp; Date</th>
+              <th>New Recurring Complaint</th>
+              <th>Campus</th>
+              <th>Days Elapsed</th>
+              <th>Recurrence Classification</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in recurrence_analysis.recurrence_items %}
+              <tr>
+                <td>
+                  <a href="{{ url_for('complaints.detail', complaint_id=item.resolved_id) }}" class="fw-bold text-decoration-none text-dark">
+                    {{ item.resolved_ref }}
+                  </a>
+                  <div class="small text-muted text-truncate" style="max-width: 200px;" title="{{ item.resolved_title }}">{{ item.resolved_title }}</div>
+                </td>
+                <td style="max-width: 220px;">
+                  <div class="small text-dark text-truncate" title="{{ item.resolution_notes }}">{{ item.resolution_notes }}</div>
+                  <div class="small text-muted" style="font-size: 0.72rem;"><i class="bi bi-calendar-check me-1"></i>{{ item.resolved_date }}</div>
+                </td>
+                <td>
+                  <a href="{{ url_for('complaints.detail', complaint_id=item.recurring_id) }}" class="fw-bold text-decoration-none text-dark">
+                    {{ item.recurring_ref }}
+                  </a>
+                  <div class="small text-dark text-truncate" style="max-width: 200px;" title="{{ item.recurring_title }}">{{ item.recurring_title }}</div>
+                  <span class="badge bg-light text-dark border" style="font-size: 0.7rem;">Status: {{ item.recurring_status }}</span>
+                </td>
+                <td class="small fw-semibold text-truncate" style="max-width: 150px;" title="{{ item.institution_name }}">
+                  {{ item.institution_name }}
+                </td>
+                <td>
+                  <span class="badge bg-secondary">{{ item.days_elapsed }} days post-fix</span>
+                </td>
+                <td>
+                  {% if item.recurrence_type == 'Confirmed Recurrence' %}
+                    <span class="badge bg-danger"><i class="bi bi-exclamation-octagon-fill me-1"></i>Confirmed Recurrence ({{ item.similarity_score }}%)</span>
+                  {% else %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle-fill me-1"></i>Suspected Recurrence ({{ item.similarity_score }}%)</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="p-4 text-center text-muted">No post-resolution recurring grievances detected in the current filter.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Workload & Efficiency Tables -->
+<div class="row g-4 mb-4">
+  <div class="col-lg-6">
+    <div class="gov-card h-100">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title"><i class="bi bi-speedometer2 me-2 text-primary"></i>Resolution Efficiency by Timeline</h6>
+      </div>
+      <div class="gov-card-body">
+        <div class="d-flex align-items-center justify-content-between p-3 bg-light rounded border mb-3">
+          <div>
+            <div class="small text-muted">Average Resolution Timeline</div>
+            <h4 class="fw-bold text-dark mb-0">{{ metrics.avg_resolution_days }} Days</h4>
+          </div>
+          <div class="text-end">
+            <div class="small text-muted">Total Resolved</div>
+            <h4 class="fw-bold text-success mb-0">{{ metrics.resolved_complaints }}</h4>
+          </div>
+        </div>
+
+        <h6 class="fw-bold small text-muted text-uppercase mb-2">Institutions with Highest Grievance Volume</h6>
+        <div class="list-group list-group-flush border rounded">
+          {% for inst in metrics.top_institutions %}
+            <div class="list-group-item d-flex justify-content-between align-items-center py-2">
+              <span class="small fw-semibold text-dark">{{ inst.name }}</span>
+              <span class="badge bg-primary rounded-pill">{{ inst.count }} complaints</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="gov-card h-100">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title"><i class="bi bi-people me-2 text-primary"></i>Administrative Reviewer Workload</h6>
+      </div>
+      <div class="gov-card-body p-0">
+        <div class="table-responsive">
+          <table class="gov-table mb-0">
+            <thead>
+              <tr>
+                <th>Reviewer Name</th>
+                <th>Role</th>
+                <th>Assigned Complaints</th>
+                <th>Overlaps Reviewed</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for rw in reviewer_workload %}
+                <tr>
+                  <td class="fw-bold text-dark">{{ rw.name }}</td>
+                  <td><span class="badge bg-light text-dark border">{{ rw.role }}</span></td>
+                  <td>{{ rw.assigned_complaints }}</td>
+                  <td>{{ rw.reviewed_overlaps }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Data passed from backend analytics service
+  const trendData = {{ overlap_trends | tojson }};
+  const instData = {{ inst_comparison | tojson }};
+  const categoryData = {{ category_overlaps | tojson }};
+  const recurrenceData = {{ recurrence_analysis | tojson }};
+  const networkData = {{ network_graph | tojson }};
+
+  // -------------------------------------------------------------
+  // GRAPH A: Complaint Overlap Trend (Line Graph)
+  // -------------------------------------------------------------
+  const trendCtx = document.getElementById('overlapTrendChart').getContext('2d');
+  new Chart(trendCtx, {
+    type: 'line',
+    data: {
+      labels: trendData.labels,
+      datasets: [
+        {
+          label: 'Strong Potential Overlaps (≥80%)',
+          data: trendData.strong_counts,
+          borderColor: '#dc3545',
+          backgroundColor: 'rgba(220, 53, 69, 0.1)',
+          borderWidth: 2.5,
+          tension: 0.3,
+          fill: true,
+          pointBackgroundColor: '#dc3545',
+          pointRadius: 4,
+        },
+        {
+          label: 'Possible Overlaps (50%–79%)',
+          data: trendData.possible_counts,
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          borderWidth: 2.5,
+          tension: 0.3,
+          fill: true,
+          pointBackgroundColor: '#f59e0b',
+          pointRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 12 } } },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          backgroundColor: '#0f2b48',
+          titleFont: { weight: 'bold' }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { stepSize: 1, precision: 0 },
+          grid: { color: 'rgba(0, 0, 0, 0.05)' }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // -------------------------------------------------------------
+  // GRAPH C: Institution-wise Overlap Comparison (Stacked Bar)
+  // -------------------------------------------------------------
+  const instCtx = document.getElementById('institutionOverlapChart').getContext('2d');
+  new Chart(instCtx, {
+    type: 'bar',
+    data: {
+      labels: instData.labels,
+      datasets: [
+        {
+          label: 'Same-Inst Strong',
+          data: instData.same_strong,
+          backgroundColor: '#dc3545',
+          stack: 'Same'
+        },
+        {
+          label: 'Same-Inst Possible',
+          data: instData.same_possible,
+          backgroundColor: '#f59e0b',
+          stack: 'Same'
+        },
+        {
+          label: 'Cross-Inst Strong',
+          data: instData.cross_strong,
+          backgroundColor: '#7c3aed',
+          stack: 'Cross'
+        },
+        {
+          label: 'Cross-Inst Possible',
+          data: instData.cross_possible,
+          backgroundColor: '#0284c7',
+          stack: 'Cross'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } },
+        tooltip: { backgroundColor: '#0f2b48' }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: {
+          stacked: true,
+          beginAtZero: true,
+          ticks: { stepSize: 1, precision: 0 },
+          grid: { color: 'rgba(0,0,0,0.05)' }
+        }
+      }
+    }
+  });
+
+  // -------------------------------------------------------------
+  // GRAPH D: Complaint Category Overlap (Horizontal Bar)
+  // -------------------------------------------------------------
+  const catCtx = document.getElementById('categoryOverlapChart').getContext('2d');
+  new Chart(catCtx, {
+    type: 'bar',
+    data: {
+      labels: categoryData.labels,
+      datasets: [
+        {
+          label: 'Strong Overlaps',
+          data: categoryData.strong,
+          backgroundColor: '#dc3545'
+        },
+        {
+          label: 'Possible Overlaps',
+          data: categoryData.possible,
+          backgroundColor: '#f59e0b'
+        }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { backgroundColor: '#0f2b48' }
+      },
+      scales: {
+        x: {
+          stacked: true,
+          beginAtZero: true,
+          ticks: { stepSize: 1, precision: 0 },
+          grid: { color: 'rgba(0,0,0,0.05)' }
+        },
+        y: {
+          stacked: true,
+          grid: { display: false },
+          ticks: { font: { size: 10 } }
+        }
+      }
+    }
+  });
+
+  // -------------------------------------------------------------
+  // GRAPH E: Resolution and Recurrence Analysis (Donut)
+  // -------------------------------------------------------------
+  const recCtx = document.getElementById('recurrenceDonutChart').getContext('2d');
+  new Chart(recCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Clean / Permanent Resolutions', 'Suspected Recurrences', 'Confirmed Recurrences'],
+      datasets: [{
+        data: [
+          recurrenceData.clean_resolved,
+          recurrenceData.suspected_count,
+          recurrenceData.confirmed_count
+        ],
+        backgroundColor: ['#10b981', '#f59e0b', '#dc3545'],
+        borderWidth: 2,
+        borderColor: '#ffffff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { backgroundColor: '#0f2b48' }
+      },
+      cutout: '62%'
+    }
+  });
+
+  // -------------------------------------------------------------
+  // GRAPH B: Interactive Complaint Relationship Graph (HTML5 Canvas)
+  // -------------------------------------------------------------
+  (function initRelationshipGraph() {
+    const canvas = document.getElementById('networkCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    // High-DPI canvas scaling
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    const width = canvas.getBoundingClientRect().width;
+    const height = canvas.getBoundingClientRect().height;
+
+    // Build node map and positions
+    const nodes = networkData.nodes.map((n, i) => {
+      const angle = (i / networkData.nodes.length) * Math.PI * 2;
+      const radius = Math.min(width, height) * 0.35;
+      return {
+        ...n,
+        x: (width / 2) + Math.cos(angle) * radius + (Math.random() - 0.5) * 40,
+        y: (height / 2) + Math.sin(angle) * radius + (Math.random() - 0.5) * 40,
+        vx: 0,
+        vy: 0,
+        radius: n.has_connections ? 16 : 11,
+      };
+    });
+
+    const nodeMap = {};
+    nodes.forEach(n => { nodeMap[n.id] = n; });
+
+    const edges = networkData.edges.map(e => ({
+      ...e,
+      sourceNode: nodeMap[e.source],
+      targetNode: nodeMap[e.target],
+    })).filter(e => e.sourceNode && e.targetNode);
+
+    let selectedNode = null;
+    let hoveredNode = null;
+    let hoveredEdge = null;
+    let draggedNode = null;
+
+    // Simulation physics parameters
+    let iterations = 0;
+    const maxIterations = 350;
+
+    function tickPhysics() {
+      if (iterations >= maxIterations && !draggedNode) return;
+      iterations++;
+
+      const k = 0.05; // spring constant
+      const repulsion = 1200; // node repulsion
+
+      // Repulsion between all node pairs
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const n1 = nodes[i];
+          const n2 = nodes[j];
+          const dx = n2.x - n1.x;
+          const dy = n2.y - n1.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          if (dist < 260) {
+            const force = repulsion / (dist * dist);
+            const fx = (dx / dist) * force;
+            const fy = (dy / dist) * force;
+            n1.vx -= fx;
+            n1.vy -= fy;
+            n2.vx += fx;
+            n2.vy += fy;
+          }
+        }
+      }
+
+      // Spring attraction along edges
+      edges.forEach(e => {
+        const dx = e.targetNode.x - e.sourceNode.x;
+        const dy = e.targetNode.y - e.sourceNode.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const targetDist = e.is_strong ? 85 : 125;
+        const force = (dist - targetDist) * k;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        e.sourceNode.vx += fx;
+        e.sourceNode.vy += fy;
+        e.targetNode.vx -= fx;
+        e.targetNode.vy -= fy;
+      });
+
+      // Gravity towards center & friction
+      nodes.forEach(n => {
+        if (n === draggedNode) return;
+        n.vx += ((width / 2) - n.x) * 0.005;
+        n.vy += ((height / 2) - n.y) * 0.005;
+        n.x += n.vx * 0.6;
+        n.y += n.vy * 0.6;
+        n.vx *= 0.75;
+        n.vy *= 0.75;
+
+        // Boundaries
+        n.x = Math.max(30, Math.min(width - 30, n.x));
+        n.y = Math.max(30, Math.min(height - 30, n.y));
+      });
+    }
+
+    // Color palette for nodes based on category
+    function getNodeColor(category) {
+      if (category.includes('Laboratory')) return '#2563eb';
+      if (category.includes('Sanitation')) return '#06b6d4';
+      if (category.includes('Hostel')) return '#d97706';
+      if (category.includes('Ragging')) return '#b91c1c';
+      if (category.includes('Scholarship') || category.includes('Financial')) return '#059669';
+      if (category.includes('Faculty')) return '#7c3aed';
+      if (category.includes('Safety')) return '#ea580c';
+      return '#475569';
+    }
+
+    function render() {
+      tickPhysics();
+
+      const rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      // Draw Edges
+      edges.forEach(e => {
+        const isConnected = selectedNode && (e.sourceNode.id === selectedNode.id || e.targetNode.id === selectedNode.id);
+        const isHovered = (hoveredEdge === e) || isConnected;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(e.sourceNode.x, e.sourceNode.y);
+        ctx.lineTo(e.targetNode.x, e.targetNode.y);
+
+        if (e.is_strong) {
+          // Strong Overlap
+          ctx.strokeStyle = isHovered ? '#b91c1c' : 'rgba(220, 53, 69, 0.75)';
+          ctx.lineWidth = isHovered ? 3.5 : 2.5;
+          ctx.setLineDash([]);
+        } else {
+          // Possible Overlap
+          ctx.strokeStyle = isHovered ? '#d97706' : 'rgba(245, 158, 11, 0.65)';
+          ctx.lineWidth = isHovered ? 2.5 : 1.8;
+          ctx.setLineDash([5, 4]);
+        }
+
+        if (!e.same_institution) {
+          // Cross-institution indicator stroke halo
+          ctx.shadowColor = '#0284c7';
+          ctx.shadowBlur = 4;
+        }
+
+        ctx.stroke();
+        ctx.restore();
+
+        // Edge label (similarity percentage pill)
+        const midX = (e.sourceNode.x + e.targetNode.x) / 2;
+        const midY = (e.sourceNode.y + e.targetNode.y) / 2;
+
+        if (isHovered || e.is_strong) {
+          ctx.save();
+          ctx.fillStyle = e.is_strong ? '#dc3545' : '#f59e0b';
+          ctx.beginPath();
+          ctx.arc(midX, midY, 10, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 8px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(Math.round(e.similarity_pct) + '%', midX, midY);
+          ctx.restore();
+        }
+      });
+
+      // Draw Nodes
+      nodes.forEach(n => {
+        const isSelected = selectedNode && selectedNode.id === n.id;
+        const isHovered = hoveredNode && hoveredNode.id === n.id;
+        const isConnected = selectedNode && edges.some(e => 
+          (e.sourceNode.id === selectedNode.id && e.targetNode.id === n.id) ||
+          (e.targetNode.id === selectedNode.id && e.sourceNode.id === n.id)
+        );
+
+        ctx.save();
+
+        // Outer glow on select/hover
+        if (isSelected || isHovered) {
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, n.radius + 6, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(26, 86, 140, 0.2)';
+          ctx.fill();
+        } else if (isConnected) {
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, n.radius + 4, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(220, 53, 69, 0.15)';
+          ctx.fill();
+        }
+
+        // Node Circle Body
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+        ctx.fillStyle = getNodeColor(n.category);
+        ctx.fill();
+        ctx.lineWidth = isSelected ? 3 : 1.5;
+        ctx.strokeStyle = isSelected ? '#0f2b48' : '#ffffff';
+        ctx.stroke();
+
+        // Node Label (Short Ref)
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 8px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const shortLabel = n.ref.replace('AICTE-2026-CMP-', '#');
+        ctx.fillText(shortLabel, n.x, n.y);
+
+        // Outside Text Tag
+        if (n.has_connections || isSelected || isHovered) {
+          ctx.fillStyle = '#1e293b';
+          ctx.font = '500 9px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(n.ref.split('-').pop(), n.x, n.y + n.radius + 10);
+        }
+
+        ctx.restore();
+      });
+
+      requestAnimationFrame(render);
+    }
+    requestAnimationFrame(render);
+
+    // Mouse / Pointer Interaction
+    function getNodeAt(x, y) {
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const n = nodes[i];
+        const dx = n.x - x;
+        const dy = n.y - y;
+        if (Math.sqrt(dx * dx + dy * dy) <= n.radius + 5) {
+          return n;
+        }
+      }
+      return null;
+    }
+
+    function getEdgeAt(x, y) {
+      for (const e of edges) {
+        const x1 = e.sourceNode.x, y1 = e.sourceNode.y;
+        const x2 = e.targetNode.x, y2 = e.targetNode.y;
+        const lineLen = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        if (lineLen === 0) continue;
+        const dist = Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / lineLen;
+        const dot = ((x - x1) * (x2 - x1) + (y - y1) * (y2 - y1)) / (lineLen ** 2);
+        if (dist <= 6 && dot >= 0 && dot <= 1) {
+          return e;
+        }
+      }
+      return null;
+    }
+
+    canvas.addEventListener('mousemove', e => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      if (draggedNode) {
+        draggedNode.x = x;
+        draggedNode.y = y;
+        iterations = 0;
+        return;
+      }
+
+      hoveredNode = getNodeAt(x, y);
+      hoveredEdge = hoveredNode ? null : getEdgeAt(x, y);
+      canvas.style.cursor = (hoveredNode || hoveredEdge) ? 'pointer' : 'grab';
+    });
+
+    canvas.addEventListener('mousedown', e => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const clicked = getNodeAt(x, y);
+      if (clicked) {
+        draggedNode = clicked;
+        selectedNode = clicked;
+        updateInspectorForNode(clicked);
+      } else {
+        const clickedEdge = getEdgeAt(x, y);
+        if (clickedEdge) {
+          updateInspectorForEdge(clickedEdge);
+        }
+      }
+    });
+
+    window.addEventListener('mouseup', () => {
+      draggedNode = null;
+    });
+
+    // Reset Network Button
+    document.getElementById('btnResetGraph').addEventListener('click', () => {
+      nodes.forEach((n, i) => {
+        const angle = (i / nodes.length) * Math.PI * 2;
+        const radius = Math.min(width, height) * 0.35;
+        n.x = (width / 2) + Math.cos(angle) * radius;
+        n.y = (height / 2) + Math.sin(angle) * radius;
+        n.vx = 0;
+        n.vy = 0;
+      });
+      iterations = 0;
+    });
+
+    // Update Side Inspector for a selected Node
+    function updateInspectorForNode(node) {
+      document.getElementById('inspectorBadge').innerText = node.ref;
+
+      // Find all connected edges
+      const connectedEdges = edges.filter(e => e.sourceNode.id === node.id || e.targetNode.id === node.id);
+
+      let linksHtml = '';
+      if (connectedEdges.length > 0) {
+        linksHtml = `
+          <div class="mt-3">
+            <div class="small fw-bold text-uppercase text-muted mb-2">Connected Overlaps (${connectedEdges.length})</div>
+            <div class="list-group list-group-flush border rounded">
+              ${connectedEdges.map(e => {
+                const partner = e.sourceNode.id === node.id ? e.targetNode : e.sourceNode;
+                const badgeClass = e.is_strong ? 'bg-danger text-white' : 'bg-warning text-dark';
+                const instBadge = e.same_institution ? 'Same Campus' : 'Cross-Institution';
+                return `
+                  <div class="list-group-item p-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <span class="fw-bold small text-dark">${partner.ref}</span>
+                      <span class="badge ${badgeClass}">${e.similarity_pct}% Match</span>
+                    </div>
+                    <div class="small text-dark text-truncate" title="${partner.title}">${partner.title}</div>
+                    <div class="d-flex justify-content-between align-items-center mt-1" style="font-size: 0.72rem;">
+                      <span class="text-muted">${partner.institution_code}</span>
+                      <span class="badge bg-light text-dark border">${instBadge}</span>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      } else {
+        linksHtml = `
+          <div class="alert alert-light border small text-muted mt-3 py-2">
+            <i class="bi bi-shield-check text-success me-1"></i> No algorithmic overlaps detected for this complaint.
+          </div>
+        `;
+      }
+
+      document.getElementById('inspectorContent').innerHTML = `
+        <div class="mb-2">
+          <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 mb-1">${node.category}</span>
+          ${node.is_confidential ? '<span class="badge bg-warning text-dark border border-warning ms-1"><i class="bi bi-shield-lock-fill"></i> Confidential</span>' : ''}
+          <h6 class="fw-bold text-dark mt-1 mb-1">${node.title}</h6>
+        </div>
+
+        <div class="p-2 bg-light rounded border small mb-2">
+          <div class="d-flex justify-content-between text-muted mb-1">
+            <span>Institution:</span>
+            <span class="fw-semibold text-dark">${node.institution_name}</span>
+          </div>
+          <div class="d-flex justify-content-between text-muted mb-1">
+            <span>Code:</span>
+            <code>${node.institution_code}</code>
+          </div>
+          <div class="d-flex justify-content-between text-muted mb-1">
+            <span>Status:</span>
+            <span class="badge bg-secondary">${node.status}</span>
+          </div>
+          <div class="d-flex justify-content-between text-muted">
+            <span>Submission Date:</span>
+            <span>${node.date}</span>
+          </div>
+        </div>
+
+        <a href="/complaints/${node.id}" class="btn btn-gov-primary btn-sm w-100 mb-2">
+          <i class="bi bi-box-arrow-up-right me-1"></i> Open Full Complaint Record
+        </a>
+
+        ${linksHtml}
+      `;
+    }
+
+    // Update Side Inspector for a clicked Edge
+    function updateInspectorForEdge(edge) {
+      document.getElementById('inspectorBadge').innerText = `${edge.similarity_pct}% Overlap`;
+
+      document.getElementById('inspectorContent').innerHTML = `
+        <div class="mb-3 text-center">
+          <span class="badge ${edge.is_strong ? 'bg-danger text-white' : 'bg-warning text-dark'} fs-6 py-2 px-3">
+            <i class="bi bi-link-45deg me-1"></i> ${edge.similarity_pct}% Match Score
+          </span>
+          <div class="small text-muted mt-1">${edge.relationship_type}</div>
+          <span class="badge ${edge.same_institution ? 'bg-primary' : 'bg-info text-dark'} mt-1">
+            ${edge.same_institution ? 'Same Institution Incident' : 'Cross-Institution Similarity'}
+          </span>
+        </div>
+
+        <div class="border rounded p-2 mb-2 bg-light small">
+          <div class="fw-bold text-dark mb-1">First Complaint:</div>
+          <div class="fw-semibold text-primary">${edge.source_ref}</div>
+          <div class="text-truncate mb-1" title="${edge.source_title}">${edge.source_title}</div>
+          <div class="text-muted" style="font-size: 0.72rem;">${edge.source_inst}</div>
+        </div>
+
+        <div class="border rounded p-2 mb-3 bg-light small">
+          <div class="fw-bold text-dark mb-1">Second Complaint:</div>
+          <div class="fw-semibold text-primary">${edge.target_ref}</div>
+          <div class="text-truncate mb-1" title="${edge.target_title}">${edge.target_title}</div>
+          <div class="text-muted" style="font-size: 0.72rem;">${edge.target_inst}</div>
+        </div>
+
+        <a href="/overlaps" class="btn btn-gov-primary btn-sm w-100">
+          <i class="bi bi-diagram-3 me-1"></i> Open Overlap Review Workspace
+        </a>
+      `;
+    }
+
+    // Auto-select first connected node on load
+    const firstConnected = nodes.find(n => n.has_connections);
+    if (firstConnected) {
+      selectedNode = firstConnected;
+      updateInspectorForNode(firstConnected);
+    }
+  })();
+</script>
+{% endblock %}

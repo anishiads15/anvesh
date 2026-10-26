@@ -1,0 +1,7 @@
+Flask>=3.1.0
+SQLAlchemy>=2.0.30
+scikit-learn>=1.4.0
+numpy>=1.26.0
+python-dotenv>=1.0.0
+pytest>=8.0.0
+sentence-transformers>=3.0.0; extra == "ai"

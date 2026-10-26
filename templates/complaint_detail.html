@@ -1,0 +1,1171 @@
+{% extends "base.html" %}
+
+{% block title %}{{ complaint.reference_number }} — ANVESH AICTE Platform{% endblock %}
+
+{% block content %}
+<!-- Top Header and Badges -->
+<div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
+  <div>
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <a href="{{ url_for('complaints.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> All Complaints</a>
+      <h4 class="fw-bold mb-0 text-dark d-flex align-items-center gap-2">
+        {{ complaint.reference_number }}
+        <button type="button" class="btn-copy-chip" data-copy-text="{{ complaint.reference_number }}" title="Copy Reference ID" aria-label="Copy Reference ID">
+          <i class="bi bi-clipboard"></i> Copy
+        </button>
+      </h4>
+      
+      <!-- Status Badge -->
+      {% if complaint.status == 'Open' %}
+        <span class="badge badge-status-open px-3 py-2 fs-6">Open</span>
+      {% elif complaint.status == 'Under Review' %}
+        <span class="badge badge-status-under-review px-3 py-2 fs-6">Under Review</span>
+      {% elif complaint.status == 'Escalated' %}
+        <span class="badge badge-status-escalated px-3 py-2 fs-6">Escalated</span>
+      {% elif complaint.status == 'Resolved' %}
+        <span class="badge badge-status-resolved px-3 py-2 fs-6">Resolved</span>
+      {% else %}
+        <span class="badge badge-status-closed px-3 py-2 fs-6">{{ complaint.status }}</span>
+      {% endif %}
+
+      <!-- Priority Badge -->
+      {% if complaint.priority == 'Critical' %}
+        <span class="badge badge-priority-critical px-2 py-1"><i class="bi bi-lightning-fill"></i> Critical Priority</span>
+      {% elif complaint.priority == 'High' %}
+        <span class="badge badge-priority-high px-2 py-1">High Priority</span>
+      {% elif complaint.priority == 'Medium' %}
+        <span class="badge badge-priority-medium px-2 py-1">Medium Priority</span>
+      {% else %}
+        <span class="badge badge-priority-low px-2 py-1">Low Priority</span>
+      {% endif %}
+    </div>
+    <p class="text-muted small mb-0">Registered on {{ complaint.created_at | format_datetime }} &bull; Last updated {{ complaint.updated_at | format_datetime }}</p>
+  </div>
+
+  <div class="d-flex flex-wrap gap-2">
+    <button type="button" class="btn btn-primary btn-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#resolutionControlModal">
+      <i class="bi bi-check2-circle me-1"></i> Resolution Control
+    </button>
+    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#routingModal">
+      <i class="bi bi-inboxes me-1"></i> Routing Decision
+    </button>
+    <button type="button" class="btn btn-outline-info btn-sm text-dark" data-bs-toggle="modal" data-bs-target="#groupModal">
+      <i class="bi bi-link-45deg me-1"></i> Shared Issue Group
+    </button>
+    {% if g.current_user.is_institution_admin %}
+      <button type="button" class="btn btn-warning btn-sm text-dark fw-semibold" data-bs-toggle="modal" data-bs-target="#instActionModal">
+        <i class="bi bi-building-gear me-1"></i> Institutional Action
+      </button>
+    {% endif %}
+    {% if g.current_user.is_aicte_officer or g.current_user.is_super_admin %}
+      <button type="button" class="btn btn-danger btn-sm text-white fw-semibold" data-bs-toggle="modal" data-bs-target="#aicteActionModal">
+        <i class="bi bi-shield-shaded me-1"></i> AICTE Regulatory Action
+      </button>
+    {% endif %}
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#statusModal">
+      <i class="bi bi-pencil-square me-1"></i> Update Status
+    </button>
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#assignModal">
+      <i class="bi bi-person-check me-1"></i> Assign Reviewer
+    </button>
+    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#categoryModal">
+      <i class="bi bi-tag me-1"></i> Override Category
+    </button>
+  </div>
+</div>
+
+<!-- Prominent Overlap Banner if detected -->
+{% if complaint.highest_overlap_badge == 'STRONG_POTENTIAL' %}
+  <div class="alert alert-danger border-2 shadow-sm d-flex align-items-center justify-content-between p-3 mb-4">
+    <div class="d-flex align-items-center gap-3">
+      <i class="bi bi-exclamation-octagon-fill fs-2 text-danger"></i>
+      <div>
+        <h6 class="fw-bold mb-0 text-danger">STRONG POTENTIAL OVERLAP DETECTED</h6>
+        <div class="small text-dark">The AI detection engine has identified strong semantic correlation with existing complaints. Duplicate investigation review required before separate administrative action.</div>
+      </div>
+    </div>
+    <a href="#overlapsSection" class="btn btn-danger btn-sm text-nowrap">View Matched Complaints</a>
+  </div>
+{% elif complaint.highest_overlap_badge == 'POSSIBLE_OVERLAP' %}
+  <div class="alert alert-warning border-2 shadow-sm d-flex align-items-center justify-content-between p-3 mb-4">
+    <div class="d-flex align-items-center gap-3">
+      <i class="bi bi-exclamation-triangle-fill fs-2 text-warning"></i>
+      <div>
+        <h6 class="fw-bold mb-0 text-dark">POSSIBLE OVERLAP — REVIEW REQUIRED</h6>
+        <div class="small text-secondary">Contextual similarities detected with another complaint. Administrative verification recommended.</div>
+      </div>
+    </div>
+    <a href="#overlapsSection" class="btn btn-warning btn-sm text-dark text-nowrap">Inspect Overlaps</a>
+  </div>
+{% elif complaint.highest_overlap_badge == 'CONFIRMED_RELATED' %}
+  <div class="alert alert-success border-2 shadow-sm d-flex align-items-center justify-content-between p-3 mb-4">
+    <div class="d-flex align-items-center gap-3">
+      <i class="bi bi-link-45deg fs-2 text-success"></i>
+      <div>
+        <h6 class="fw-bold mb-0 text-success">HUMAN-CONFIRMED RELATED RECORD</h6>
+        <div class="small text-dark">An administrative reviewer has verified that this complaint is connected to an existing incident record.</div>
+      </div>
+    </div>
+    <a href="#overlapsSection" class="btn btn-success btn-sm text-nowrap">Inspect Linkage</a>
+  </div>
+{% endif %}
+
+<!-- Escalation, AICTE Directive, and Reopen Banners -->
+{% if complaint.escalation_reason %}
+  <div class="alert alert-danger shadow-sm border-2 mb-4">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <i class="bi bi-shield-fill-exclamation fs-5 text-danger"></i>
+      <h6 class="fw-bold mb-0 text-danger">ESCALATED TO AICTE FOR CENTRAL REGULATORY OVERSIGHT</h6>
+    </div>
+    <div class="small text-dark mb-1"><strong>Escalation Rationale:</strong> {{ complaint.escalation_reason }}</div>
+    <div class="small text-muted" style="font-size: 0.72rem;">Escalated on {{ complaint.escalated_at.strftime('%d %B %Y, %H:%M UTC') if complaint.escalated_at else 'Recent' }}</div>
+  </div>
+{% endif %}
+
+{% if complaint.aicte_remarks %}
+  <div class="alert alert-info shadow-sm border-2 mb-4">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <i class="bi bi-info-circle-fill fs-5 text-info"></i>
+      <h6 class="fw-bold mb-0 text-dark">AICTE DIRECTIVE / REMARKS</h6>
+    </div>
+    <div class="small text-dark">{{ complaint.aicte_remarks }}</div>
+  </div>
+{% endif %}
+
+{% if complaint.reopen_reason %}
+  <div class="alert alert-warning shadow-sm border-2 mb-4">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <i class="bi bi-arrow-repeat fs-5 text-warning"></i>
+      <h6 class="fw-bold mb-0 text-dark">GRIEVANCE REOPENED BY COMPLAINANT</h6>
+    </div>
+    <div class="small text-dark"><strong>Reason for Reopening:</strong> {{ complaint.reopen_reason }}</div>
+  </div>
+{% endif %}
+
+<div class="row g-4 mb-4">
+  <!-- Left Column: Complaint Details -->
+  <div class="col-lg-8">
+    <div class="gov-card mb-4">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title"><i class="bi bi-text-paragraph me-2 text-primary"></i>Grievance Statement</h6>
+        <span class="badge bg-light text-dark border">{{ complaint.source_channel }}</span>
+      </div>
+      <div class="gov-card-body">
+        <h5 class="fw-bold text-dark mb-3">{{ complaint.title }}</h5>
+
+        <!-- Complainant Identity and Confidentiality Protection -->
+        <div class="d-flex align-items-center gap-2 mb-3 p-2 bg-light border rounded small">
+          <span class="text-muted"><i class="bi bi-person-fill text-secondary me-1"></i>Complainant:</span>
+          {% if complaint.is_confidential %}
+            <span class="badge bg-warning bg-opacity-25 text-dark border border-warning">
+              <i class="bi bi-shield-lock-fill text-warning me-1"></i>CONFIDENTIAL COMPLAINANT (Identity Protected)
+            </span>
+          {% else %}
+            <span class="fw-semibold text-dark">{{ complaint.complainant_name or 'Anonymous / Grievant' }}</span>
+          {% endif %}
+          <span class="text-muted ms-auto">&bull; Channel: <strong>{{ complaint.source_channel }}</strong></span>
+        </div>
+
+        <div class="p-3 bg-light rounded border text-dark mb-3" style="white-space: pre-wrap; line-height: 1.6;">
+{{ complaint.description }}
+        </div>
+
+        {% if complaint.supporting_reference %}
+          <div class="small text-muted mb-2">
+            <strong>Supporting Docket Reference:</strong> <code>{{ complaint.supporting_reference }}</code>
+          </div>
+        {% endif %}
+
+        {% if complaint.attachment_filename %}
+          <div class="p-2 mb-3 bg-light rounded border d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-file-earmark-pdf-fill text-danger fs-5"></i>
+              <div>
+                <div class="small fw-semibold text-dark">{{ complaint.attachment_filename }}</div>
+                <div class="text-muted" style="font-size: 0.72rem;">Uploaded Supporting Documentation</div>
+              </div>
+            </div>
+            <a href="{{ url_for('complaints.view_evidence', complaint_id=complaint.id, filename=complaint.attachment_filename) }}" target="_blank" class="btn btn-sm btn-outline-primary py-1 px-2 fw-semibold">
+              <i class="bi bi-box-arrow-up-right me-1"></i> Preview / Download
+            </a>
+          </div>
+        {% endif %}
+
+        {% if complaint.feedback_rating %}
+          <div class="p-3 bg-white rounded border border-success mb-3 shadow-sm">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <div class="fw-bold text-success small">
+                <i class="bi bi-star-fill text-warning me-1"></i> Complainant Resolution Feedback:
+              </div>
+              <span class="badge bg-success">{{ complaint.feedback_rating }} / 5 Stars</span>
+            </div>
+            <div class="text-warning mb-1">
+              {% for star in range(complaint.feedback_rating) %}<i class="bi bi-star-fill"></i>{% endfor %}
+              {% for star in range(5 - complaint.feedback_rating) %}<i class="bi bi-star text-muted"></i>{% endfor %}
+            </div>
+            {% if complaint.feedback_notes %}
+              <p class="mb-0 small text-secondary fst-italic">"{{ complaint.feedback_notes }}"</p>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        {% if complaint.official_remarks %}
+          <div class="p-3 bg-white rounded border border-warning mb-3">
+            <div class="fw-bold text-dark small mb-1"><i class="bi bi-lock-fill text-warning me-1"></i>Internal Institutional Remarks:</div>
+            <p class="mb-0 small text-secondary" style="white-space: pre-wrap;">{{ complaint.official_remarks }}</p>
+          </div>
+        {% endif %}
+
+        {% if complaint.resolution_notes %}
+          <div class="alert alert-success mt-3 mb-0">
+            <h6 class="fw-bold text-success mb-1"><i class="bi bi-check-circle-fill me-1"></i>Resolution Statement</h6>
+            <p class="mb-1 small text-dark">{{ complaint.resolution_notes }}</p>
+            <div class="small text-muted" style="font-size: 0.75rem;">Resolved on {{ complaint.resolution_date.strftime('%d %B %Y') if complaint.resolution_date else '' }}</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Prominent Resolution Decision & Propagation Control Panel (Section 4) -->
+    <div class="gov-card mb-4 border-2 shadow-sm" id="resolutionControlCard">
+      <div class="gov-card-header bg-light d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-patch-check-fill text-success fs-5"></i>
+          <h6 class="gov-card-title mb-0">Resolution Decision &amp; Propagation Control</h6>
+        </div>
+        <div>
+          <span class="badge {% if complaint.resolution_status == 'Resolved' %}bg-success{% elif complaint.resolution_status == 'Partially Resolved' %}bg-warning text-dark{% elif complaint.resolution_status == 'Reopened' %}bg-danger{% else %}bg-secondary{% endif %} px-2 py-1">
+            Current: {{ complaint.resolution_status }}
+          </span>
+        </div>
+      </div>
+      <div class="gov-card-body">
+        <form method="POST" action="{{ url_for('complaints.resolution_decision', complaint_id=complaint.id) }}">
+          <!-- State Selection Radio Pills -->
+          <div class="mb-3">
+            <label class="form-label fw-bold small text-dark">Select Resolution Determination:</label>
+            <div class="d-flex flex-wrap gap-2">
+              <input type="radio" class="btn-check" name="resolution_state" id="resStateResolved" value="Resolved" autocomplete="off" {% if complaint.resolution_status == 'Resolved' %}checked{% endif %} onchange="toggleResControls('Resolved')">
+              <label class="btn btn-outline-success btn-sm" for="resStateResolved">
+                <i class="bi bi-check-circle-fill me-1"></i> Solved / Resolved
+              </label>
+
+              <input type="radio" class="btn-check" name="resolution_state" id="resStatePartial" value="Partially Resolved" autocomplete="off" {% if complaint.resolution_status == 'Partially Resolved' %}checked{% endif %} onchange="toggleResControls('Partially Resolved')">
+              <label class="btn btn-outline-warning btn-sm text-dark" for="resStatePartial">
+                <i class="bi bi-pie-chart-fill me-1"></i> Partially Resolved
+              </label>
+
+              <input type="radio" class="btn-check" name="resolution_state" id="resStateNotSolved" value="Not Solved" autocomplete="off" {% if complaint.resolution_status == 'Not Yet Resolved' or not complaint.resolution_status %}checked{% endif %} onchange="toggleResControls('Not Solved')">
+              <label class="btn btn-outline-secondary btn-sm" for="resStateNotSolved">
+                <i class="bi bi-hourglass me-1"></i> Not Yet Resolved
+              </label>
+
+              <input type="radio" class="btn-check" name="resolution_state" id="resStateReopened" value="Reopened" autocomplete="off" {% if complaint.resolution_status == 'Reopened' %}checked{% endif %} onchange="toggleResControls('Reopened')">
+              <label class="btn btn-outline-danger btn-sm" for="resStateReopened">
+                <i class="bi bi-arrow-repeat me-1"></i> Reopened
+              </label>
+            </div>
+          </div>
+
+          <!-- Public Statement Field (Visible in student portal) -->
+          <div class="mb-3" id="publicStatementBox">
+            <label class="form-label fw-semibold small text-dark">
+              Public Resolution Statement <span class="text-danger">*</span>
+              <span class="text-muted fw-normal" style="font-size: 0.75rem;">(Visible to student in their portal with resolution date &amp; feedback controls)</span>
+            </label>
+            <textarea name="public_resolution_statement" class="form-control form-control-sm" rows="3" placeholder="Explain the concrete remedial actions taken to address this grievance...">{{ complaint.public_resolution_statement or complaint.resolution_notes or '' }}</textarea>
+          </div>
+
+          <!-- Internal Resolution Notes -->
+          <div class="mb-3">
+            <label class="form-label fw-semibold small text-muted">Internal Technical / Regulatory Notes (Administrative Record)</label>
+            <textarea name="resolution_notes" class="form-control form-control-sm" rows="2" placeholder="Administrative remarks, contractor references, or inspection findings...">{{ complaint.resolution_notes or '' }}</textarea>
+          </div>
+
+          <!-- Explicit Group Resolution Propagation Checklist -->
+          {% if complaint.related_group and complaint.related_group.complaints|length > 1 %}
+            <div class="p-3 bg-light rounded border border-info mb-3" id="groupPropagationBox">
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" name="apply_to_group" value="1" id="applyGroupCheck" onchange="document.getElementById('linkedComplaintsChecklist').style.display = this.checked ? 'block' : 'none'">
+                <label class="form-check-label fw-bold text-dark small" for="applyGroupCheck">
+                  Propagate this resolution to linked complaints in shared issue group (<code>{{ complaint.related_group.group_reference }}</code>)?
+                </label>
+              </div>
+              <div class="text-muted small mb-2" style="font-size: 0.75rem;">
+                <i class="bi bi-info-circle me-1 text-primary"></i>
+                Reviewer must explicitly confirm which complaints are genuinely addressed. Unchecked complaints remain open or partially resolved.
+              </div>
+
+              <div id="linkedComplaintsChecklist" style="display: none;" class="mt-2 border-top pt-2">
+                <div class="fw-semibold small text-dark mb-1">Select Genuinely Addressed Complaints:</div>
+                {% for item in complaint.related_group.complaints %}
+                  {% if item.id != complaint.id %}
+                    <div class="form-check small py-1">
+                      <input class="form-check-input" type="checkbox" name="selected_group_complaint_ids" value="{{ item.id }}" id="chk_grp_{{ item.id }}">
+                      <label class="form-check-label text-dark" for="chk_grp_{{ item.id }}">
+                        <strong>{{ item.reference_number }}</strong> &mdash; {{ item.title[:50] }}
+                        <span class="badge bg-light text-dark border ms-1">{{ item.status }}</span>
+                        <span class="text-muted">({{ item.display_complainant }})</span>
+                      </label>
+                    </div>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
+
+          <button type="submit" class="btn btn-success btn-sm fw-semibold">
+            <i class="bi bi-save me-1"></i> Save Resolution Determination
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Shared Related Complaint Group Section (Section 3) -->
+    <div class="gov-card mb-4" id="groupSection">
+      <div class="gov-card-header d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-diagram-3-fill text-primary fs-5"></i>
+          <h6 class="gov-card-title mb-0">Shared Related Complaint Group</h6>
+        </div>
+        <div>
+          {% if complaint.related_group %}
+            <span class="badge bg-primary px-2 py-1">{{ complaint.related_group.group_reference }}</span>
+          {% else %}
+            <span class="badge bg-secondary px-2 py-1">Individual Complaint</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="gov-card-body">
+        {% if complaint.related_group %}
+          <div class="p-3 bg-light rounded border mb-3">
+            <div class="d-flex justify-content-between align-items-start gap-2">
+              <div>
+                <h6 class="fw-bold text-dark mb-1">
+                  <i class="bi bi-folder-check text-primary me-1"></i>
+                  {{ complaint.related_group.title }}
+                </h6>
+                <div class="small text-muted mb-2">
+                  <strong>Group Ref:</strong> <code>{{ complaint.related_group.group_reference }}</code> &bull;
+                  <strong>Category:</strong> {{ complaint.related_group.category }} &bull;
+                  <strong>Status:</strong> <span class="badge bg-light text-dark border">{{ complaint.related_group.status }}</span>
+                </div>
+                <div class="small text-dark mb-1">
+                  <strong>Common Underlying Root Cause:</strong>
+                  <div class="p-2 bg-white rounded border mt-1">{{ complaint.related_group.root_cause }}</div>
+                </div>
+              </div>
+              <div>
+                <form method="POST" action="{{ url_for('complaints.group_action', complaint_id=complaint.id) }}" onsubmit="return confirm('Remove this complaint from shared group {{ complaint.related_group.group_reference }}?');">
+                  <input type="hidden" name="action" value="unlink">
+                  <input type="hidden" name="reason" value="Unlinked by reviewer.">
+                  <button type="submit" class="btn btn-outline-danger btn-sm text-nowrap" title="Unlink this complaint from the shared group">
+                    <i class="bi bi-unlink"></i> Remove from Group
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <div class="fw-bold small text-dark mb-2">
+            <i class="bi bi-collection me-1 text-primary"></i>
+            Linked Complaints in Shared Issue Docket ({{ complaint.related_group.complaints|length }} Total):
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-bordered align-middle small mb-2 bg-white">
+              <thead class="table-light">
+                <tr>
+                  <th>Ref Number</th>
+                  <th>Title</th>
+                  <th>Institution</th>
+                  <th>Complainant</th>
+                  <th>Resolution Status</th>
+                  <th>Lodged</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in complaint.related_group.complaints %}
+                  <tr class="{% if item.id == complaint.id %}table-primary fw-semibold{% endif %}">
+                    <td>
+                      <a href="{{ url_for('complaints.detail', complaint_id=item.id) }}" class="text-decoration-none">
+                        {{ item.reference_number }}
+                      </a>
+                      {% if item.id == complaint.id %}
+                        <span class="badge bg-primary ms-1" style="font-size: 0.65rem;">Current</span>
+                      {% endif %}
+                    </td>
+                    <td><div class="text-truncate" style="max-width: 200px;">{{ item.title }}</div></td>
+                    <td>{{ item.institution.code if item.institution else 'N/A' }}</td>
+                    <td>{{ item.display_complainant }}</td>
+                    <td>
+                      <span class="badge {% if item.resolution_status == 'Resolved' %}bg-success{% elif item.resolution_status == 'Partially Resolved' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                        {{ item.resolution_status }}
+                      </span>
+                    </td>
+                    <td>{{ item.created_at.strftime('%d %b %Y') if item.created_at else '' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="small text-muted" style="font-size: 0.73rem;">
+            <i class="bi bi-shield-check text-success me-1"></i>
+            <strong>Data Integrity Guarantee:</strong> Grouping connects related complaints without merging or deleting individual records. Each complaint preserves its own ID, submission date, evidence attachments, and student portal access.
+          </div>
+        {% else %}
+          <div class="p-3 bg-light rounded border text-center">
+            <p class="small text-muted mb-3">
+              This grievance is currently registered as an individual incident. If it shares a common root cause with other complaints, link it to an existing group or create a new shared issue docket.
+            </p>
+            <div class="d-flex justify-content-center gap-2">
+              <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#groupModal">
+                <i class="bi bi-plus-circle me-1"></i> Create or Link Shared Group
+              </button>
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Potential & Confirmed Overlaps Section -->
+    <div class="gov-card mb-4" id="overlapsSection">
+      <div class="gov-card-header">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-diagram-3 me-1 text-primary"></i>
+          <h6 class="gov-card-title">Potential &amp; Confirmed Overlap Analysis</h6>
+        </div>
+        <span class="badge bg-light text-dark border">{{ overlaps | length }} relationship(s) detected</span>
+      </div>
+      <div class="gov-card-body">
+        {% if overlaps %}
+          <div class="d-grid gap-3">
+            {% for o in overlaps %}
+              {% set other = o.second_complaint if o.first_complaint_id == complaint.id else o.first_complaint %}
+              <div class="border rounded p-3 {% if o.relationship_type == 'Strong Potential Overlap' and o.review_status != 'Rejected Not Related' %}overlap-strong-highlight{% elif o.relationship_type == 'Possible Overlap' and o.review_status != 'Rejected Not Related' %}overlap-possible-highlight{% elif o.review_status == 'Confirmed Related' %}border-success bg-light{% else %}bg-white{% endif %}">
+                <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                  <div>
+                    <!-- Relationship Strength Badge -->
+                    {% if o.review_status == 'Confirmed Related' %}
+                      <span class="badge-confirmed-related"><i class="bi bi-link-45deg"></i> HUMAN-CONFIRMED RELATED</span>
+                    {% elif o.review_status == 'Rejected Not Related' %}
+                      <span class="badge bg-secondary"><i class="bi bi-x-circle me-1"></i> MARKED NOT RELATED</span>
+                    {% elif o.relationship_type == 'Strong Potential Overlap' %}
+                      <span class="badge-strong-overlap"><i class="bi bi-exclamation-octagon-fill"></i> STRONG POTENTIAL OVERLAP</span>
+                    {% else %}
+                      <span class="badge-possible-overlap"><i class="bi bi-exclamation-triangle-fill"></i> POSSIBLE OVERLAP</span>
+                    {% endif %}
+                    
+                    <span class="badge bg-dark ms-1">{{ (o.similarity_score * 100) | round(1) }}% Match Score</span>
+                  </div>
+
+                  <!-- Quick Review Actions -->
+                  <div class="d-flex gap-1">
+                    {% if o.review_status != 'Confirmed Related' %}
+                      <form method="POST" action="{{ url_for('overlaps.review_action', overlap_id=o.id) }}" class="d-inline">
+                        <input type="hidden" name="action" value="confirm">
+                        <input type="hidden" name="review_notes" value="Confirmed from complaint detail view.">
+                        <button type="submit" class="btn btn-sm btn-success py-1 px-2" title="Confirm these complaints describe the same underlying issue">
+                          <i class="bi bi-check-lg"></i> Confirm Related
+                        </button>
+                      </form>
+                    {% endif %}
+
+                    {% if o.review_status != 'Rejected Not Related' %}
+                      <form method="POST" action="{{ url_for('overlaps.review_action', overlap_id=o.id) }}" class="d-inline">
+                        <input type="hidden" name="action" value="reject">
+                        <input type="hidden" name="review_notes" value="Marked not related from complaint detail view.">
+                        <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2" title="Mark as unrelated incidents">
+                          <i class="bi bi-x-lg"></i> Not Related
+                        </button>
+                      </form>
+                    {% endif %}
+
+                    {% if o.review_status != 'Pending Review' %}
+                      <form method="POST" action="{{ url_for('overlaps.review_action', overlap_id=o.id) }}" class="d-inline">
+                        <input type="hidden" name="action" value="reset">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary py-1 px-2" title="Reset back to pending algorithmic review">
+                          <i class="bi bi-arrow-counterclockwise"></i> Reset
+                        </button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- Compared Complaint Summary -->
+                <div class="mb-2">
+                  <div class="fw-bold text-dark">
+                    Compared with:
+                    <a href="{{ url_for('complaints.detail', complaint_id=other.id) }}" class="text-decoration-none">
+                      #{{ other.id }} ({{ other.reference_number }}) &mdash; {{ other.title }}
+                    </a>
+                  </div>
+                  <div class="small text-muted">
+                    <i class="bi bi-building me-1"></i>{{ other.institution.name }} &bull;
+                    <span class="badge bg-light text-dark border">{{ other.category }}</span> &bull;
+                    Submitted: {{ other.created_at.strftime('%d %b %Y') if other.created_at else '' }}
+                  </div>
+                  <div class="small text-secondary bg-white p-2 rounded border mt-2">
+                    "{{ other.description[:180] }}{% if other.description|length > 180 %}...{% endif %}"
+                  </div>
+                </div>
+
+                <!-- Matching Evidence Breakdown -->
+                <div class="small text-dark mt-2 border-top pt-2">
+                  <div class="fw-semibold text-primary mb-1"><i class="bi bi-search me-1"></i>Algorithmic Matching Evidence:</div>
+                  <p class="mb-1">{{ o.evidence_data.summary }}</p>
+                  
+                  <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
+                    <span class="text-muted" style="font-size: 0.75rem;">Score Breakdown:</span>
+                    <span class="badge bg-light text-dark border" style="font-size: 0.7rem;">Semantic Text: {{ (o.semantic_score * 100) | round(1) }}%</span>
+                    <span class="badge bg-light text-dark border" style="font-size: 0.7rem;">Keywords: {{ (o.keyword_score * 100) | round(1) }}%</span>
+                    <span class="badge bg-light text-dark border" style="font-size: 0.7rem;">Category Compatibility: {{ (o.category_score * 100) | round(1) }}%</span>
+                    <span class="badge bg-light text-dark border" style="font-size: 0.7rem;">Context/Institution: {{ (o.context_score * 100) | round(1) }}%</span>
+                  </div>
+
+                  {% if o.evidence_data.shared_keywords %}
+                    <div class="mt-2">
+                      <span class="text-muted me-1" style="font-size: 0.75rem;">Shared Keywords:</span>
+                      {% for kw in o.evidence_data.shared_keywords %}
+                        <span class="badge bg-secondary" style="font-size: 0.7rem;">{{ kw }}</span>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+
+                  {% if o.conflicting_evidence %}
+                    <div class="text-danger small mt-2">
+                      <i class="bi bi-exclamation-diamond me-1"></i><strong>Contradictory Signal:</strong> {{ o.conflicting_evidence }}
+                    </div>
+                  {% endif %}
+
+                  {% if o.review_notes %}
+                    <div class="bg-light p-2 rounded mt-2 border small">
+                      <strong>Reviewer Notes ({{ o.reviewer.display_name if o.reviewer else 'Reviewer' }}):</strong> {{ o.review_notes }}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-center py-4 text-muted">
+            <i class="bi bi-shield-check fs-2 text-success d-block mb-1"></i>
+            No potential overlaps or duplicates detected for this complaint.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Dedicated Action Taken Card (Fix 2: Institutional Actions Taken) -->
+    <div class="gov-card mb-4" id="actionTakenSection">
+      <div class="gov-card-header d-flex justify-content-between align-items-center">
+        <h6 class="gov-card-title mb-0">
+          <i class="bi bi-journal-check text-primary"></i> Institutional Actions &amp; Interim Measures Taken
+        </h6>
+        {% if g.current_user.is_institution_admin or g.current_user.is_reviewer or g.current_user.is_super_admin %}
+          <button type="button" class="btn btn-sm btn-outline-warning text-dark fw-semibold" data-bs-toggle="modal" data-bs-target="#instActionModal">
+            <i class="bi bi-plus-circle me-1"></i> Record Action Taken
+          </button>
+        {% endif %}
+      </div>
+      <div class="gov-card-body">
+        {% if complaint.official_remarks or complaint.last_action_date %}
+          <div class="p-3 bg-light rounded border mb-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <span class="badge bg-warning text-dark"><i class="bi bi-activity me-1"></i> Active Measure</span>
+              <span class="small text-muted">Status: {{ complaint.status }}</span>
+            </div>
+            <div class="text-dark">{{ complaint.official_remarks or 'Action recorded by reviewer.' }}</div>
+            {% if complaint.last_action_date %}
+              <div class="small text-muted mt-2"><i class="bi bi-clock me-1"></i>Last Action Recorded: {{ complaint.last_action_date | format_datetime }}</div>
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="p-3 bg-light rounded border text-center text-muted small">
+            No intermediate institutional actions logged yet. When under review, recorded steps appear here without prematurely closing or resolving the grievance.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Status History Timeline -->
+    <div class="gov-card">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title"><i class="bi bi-clock-history me-2 text-primary"></i>Lifecycle Status History</h6>
+      </div>
+      <div class="gov-card-body">
+        {% if complaint.status_history %}
+          <div class="timeline">
+            {% for item in complaint.status_history %}
+              <div class="timeline-item">
+                <div class="timeline-marker"></div>
+                <div class="fw-bold text-dark">
+                  Status: <span class="badge bg-light text-dark border">{{ item.new_status }}</span>
+                  {% if item.previous_status %}
+                    <span class="text-muted fw-normal" style="font-size: 0.8rem;">(from {{ item.previous_status }})</span>
+                  {% endif %}
+                </div>
+                <div class="small text-muted">{{ item.timestamp.strftime('%d %b %Y, %H:%M UTC') }} &bull; Updated by <strong>{{ item.actor_name }}</strong></div>
+                {% if item.notes %}
+                  <div class="small text-secondary mt-1">{{ item.notes }}</div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-muted small">No lifecycle updates recorded yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Metadata & AI Classification Card -->
+  <div class="col-lg-4">
+    <!-- Institution Summary -->
+    <div class="gov-card mb-4">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title"><i class="bi bi-building me-2 text-primary"></i>Institution Information</h6>
+      </div>
+      <div class="gov-card-body">
+        <h6 class="fw-bold text-dark mb-1">{{ complaint.institution.name }}</h6>
+        <div class="small text-muted mb-2">Code: <code>{{ complaint.institution.code }}</code></div>
+        <div class="small text-muted mb-1"><i class="bi bi-geo-alt me-1"></i>{{ complaint.institution.district }}, {{ complaint.institution.state }}</div>
+        <div class="small text-muted mb-3"><i class="bi bi-mortarboard me-1"></i>{{ complaint.institution.institution_type }}</div>
+        
+        <div class="border-top pt-2">
+          <a href="{{ url_for('institutions.detail', institution_id=complaint.institution.id) }}" class="btn btn-outline-primary btn-sm w-100">
+            View Full Institution Profile
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI-Assisted Department Routing Card (Section 1) -->
+    <div class="gov-card mb-4 border-2 shadow-sm" id="routingCard">
+      <div class="gov-card-header d-flex justify-content-between align-items-center">
+        <h6 class="gov-card-title mb-0">
+          <i class="bi bi-inboxes-fill me-2 text-primary"></i>Department Routing
+        </h6>
+        {% if complaint.routed_destination %}
+          <span class="badge bg-success bg-opacity-25 text-success border border-success">
+            <i class="bi bi-check2-circle"></i> Confirmed
+          </span>
+        {% else %}
+          <span class="badge bg-warning bg-opacity-25 text-dark border border-warning">
+            <i class="bi bi-hourglass-split"></i> Review Needed
+          </span>
+        {% endif %}
+      </div>
+      <div class="gov-card-body">
+        <div class="mb-3">
+          <span class="small text-muted d-block">AI Suggested Destination:</span>
+          <span class="fw-bold text-primary fs-6">
+            <i class="bi bi-cpu me-1"></i>{{ complaint.suggested_destination or 'Pending Analysis' }}
+          </span>
+        </div>
+
+        {% if complaint.routing_confidence %}
+        <div class="mb-3">
+          <span class="small text-muted d-block">Routing Confidence:</span>
+          <div class="progress mt-1" style="height: 8px;">
+            <div class="progress-bar {% if complaint.routing_confidence >= 0.85 %}bg-success{% elif complaint.routing_confidence >= 0.70 %}bg-primary{% else %}bg-warning{% endif %}" role="progressbar" style="width: {{ complaint.routing_confidence * 100 }}%;"></div>
+          </div>
+          <div class="small text-muted mt-1" style="font-size: 0.75rem;">Confidence Score: {{ (complaint.routing_confidence * 100) | round(1) }}%</div>
+        </div>
+        {% endif %}
+
+        {% if complaint.routing_reason %}
+        <div class="mb-3 p-2 bg-light rounded border small">
+          <div class="fw-bold text-dark mb-1"><i class="bi bi-lightbulb text-warning me-1"></i>AI Recommendation Reason:</div>
+          <div class="text-secondary" style="font-size: 0.8rem; line-height: 1.4;">{{ complaint.routing_reason }}</div>
+        </div>
+        {% endif %}
+
+        <div class="border-top pt-2 mt-2">
+          <span class="small text-muted d-block">Confirmed Department Queue:</span>
+          {% if complaint.routed_destination %}
+            <span class="badge bg-primary fs-6 mt-1">{{ complaint.routed_destination }}</span>
+            <div class="small text-muted mt-1" style="font-size: 0.72rem;">
+              Decision: <strong>{{ complaint.routing_decision or 'Confirmed' }}</strong> &bull;
+              By: {{ complaint.routed_by.display_name if complaint.routed_by else 'Reviewer' }}
+              {% if complaint.routed_at %}({{ complaint.routed_at.strftime('%d %b, %H:%M') }}){% endif %}
+            </div>
+            {% if complaint.routing_override_reason %}
+              <div class="small text-danger bg-danger bg-opacity-10 p-2 rounded border border-danger border-opacity-25 mt-2">
+                <strong>Override Rationale:</strong> {{ complaint.routing_override_reason }}
+              </div>
+            {% endif %}
+          {% else %}
+            <span class="badge bg-secondary fs-6 mt-1">Pending Human Confirmation</span>
+            <div class="small text-warning mt-1" style="font-size: 0.72rem;">
+              <i class="bi bi-exclamation-circle me-1"></i>Awaiting authorized reviewer verification.
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="d-grid gap-2 mt-3">
+          {% if not complaint.routed_destination and complaint.suggested_destination %}
+            <form method="POST" action="{{ url_for('complaints.route_decision', complaint_id=complaint.id) }}">
+              <input type="hidden" name="action" value="accept">
+              <button type="submit" class="btn btn-sm btn-success w-100 fw-semibold">
+                <i class="bi bi-check-lg me-1"></i> Accept AI Suggestion ({{ complaint.suggested_destination }})
+              </button>
+            </form>
+          {% endif %}
+          <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#routingModal">
+            <i class="bi bi-arrow-left-right me-1"></i> {% if complaint.routed_destination %}Change Route Destination{% else %}Modify / Confirm Routing{% endif %}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Categorization Attribution -->
+    <div class="gov-card mb-4">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title"><i class="bi bi-tag-fill me-2 text-primary"></i>Category &amp; AI Attribution</h6>
+      </div>
+      <div class="gov-card-body">
+        <div class="mb-3">
+          <span class="small text-muted d-block">Current Category:</span>
+          <span class="fw-bold text-dark fs-6">{{ complaint.category }}</span>
+        </div>
+
+        {% if complaint.subcategory %}
+        <div class="mb-3">
+          <span class="small text-muted d-block">Subcategory:</span>
+          <span class="fw-semibold text-secondary">{{ complaint.subcategory }}</span>
+        </div>
+        {% endif %}
+
+        <div class="mb-3">
+          <span class="small text-muted d-block">Categorization Source:</span>
+          <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">{{ complaint.categorization_source }}</span>
+        </div>
+
+        {% if complaint.categorization_confidence %}
+        <div class="mb-3">
+          <span class="small text-muted d-block">Classification Confidence:</span>
+          <div class="progress mt-1" style="height: 8px;">
+            <div class="progress-bar bg-info" role="progressbar" style="width: {{ complaint.categorization_confidence * 100 }}%;"></div>
+          </div>
+          <div class="small text-muted mt-1" style="font-size: 0.75rem;">Score: {{ (complaint.categorization_confidence * 100) | round(1) }}%</div>
+        </div>
+        {% endif %}
+
+        <div class="mb-2">
+          <span class="small text-muted d-block">Assigned Reviewer:</span>
+          <span class="fw-semibold text-dark">
+            {% if complaint.assigned_reviewer %}
+              <i class="bi bi-person-badge me-1"></i>{{ complaint.assigned_reviewer.display_name }}
+            {% else %}
+              <span class="text-muted fst-italic">Unassigned</span>
+            {% endif %}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Audit Events Feed for this complaint -->
+    <div class="gov-card">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title"><i class="bi bi-shield-lock me-2 text-primary"></i>Audit Trail</h6>
+      </div>
+      <div class="gov-card-body p-0">
+        {% if audit_events %}
+          <div class="list-group list-group-flush" style="max-height: 320px; overflow-y: auto;">
+            {% for evt in audit_events %}
+              <div class="list-group-item p-2 small">
+                <div class="d-flex justify-content-between">
+                  <span class="fw-bold text-dark">{{ evt.action }}</span>
+                  <span class="text-muted" style="font-size: 0.72rem;">{{ evt.timestamp.strftime('%d/%m %H:%M') }}</span>
+                </div>
+                <div class="text-muted" style="font-size: 0.75rem;">By {{ evt.actor_name }} ({{ evt.actor_role }})</div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="p-3 text-muted small text-center">No audit events recorded.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 1: Update Status -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('complaints.update_status', complaint_id=complaint.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="statusModalLabel">Update Complaint Status</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">New Status</label>
+            <select name="status" class="form-select" required>
+              {% for s in statuses %}
+                <option value="{{ s }}" {% if complaint.status == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Action Notes / Resolution Statement</label>
+            <textarea name="notes" class="form-control" rows="3" placeholder="Provide reason or resolution details..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-gov-primary">Save Status Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 2: Assign Reviewer -->
+<div class="modal fade" id="assignModal" tabindex="-1" aria-labelledby="assignModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('complaints.assign_reviewer', complaint_id=complaint.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="assignModalLabel">Assign Reviewer</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Select Complaint Reviewer</label>
+            <select name="reviewer_id" class="form-select">
+              <option value="">Unassigned</option>
+              {% for r in reviewers %}
+                <option value="{{ r.id }}" {% if complaint.assigned_reviewer_id == r.id %}selected{% endif %}>
+                  {{ r.display_name }} ({{ r.role_title() }})
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-gov-primary">Assign</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 3: Override Category -->
+<div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('complaints.override_category', complaint_id=complaint.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="categoryModalLabel">Manual Category Override</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted">
+            Administrators may manually correct the predicted category. This override will be recorded in the immutable audit log and will trigger re-evaluation of overlap relationships.
+          </p>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">New Category</label>
+            <select name="category" class="form-select" required>
+              {% for cat in categories %}
+                <option value="{{ cat }}" {% if complaint.category == cat %}selected{% endif %}>{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Reason for Category Reassignment</label>
+            <textarea name="override_reason" class="form-control" rows="2" placeholder="e.g. AI misclassified equipment issue as general infrastructure..." required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-gov-primary">Apply Category Override</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<!-- Modal 4: Institutional Reviewer Action -->
+<div class="modal fade" id="instActionModal" tabindex="-1" aria-labelledby="instActionModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('complaints.institutional_action', complaint_id=complaint.id) }}">
+        <div class="modal-header bg-warning bg-opacity-25">
+          <h5 class="modal-title fw-bold" id="instActionModalLabel"><i class="bi bi-building-gear me-2"></i>Institutional Review Decision</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Action to Execute</label>
+            <select name="action" id="instActionSelect" class="form-select" onchange="toggleInstActionFields(this.value)" required>
+              <option value="acknowledge">1. Acknowledge Grievance (Mark Under Institutional Review)</option>
+              <option value="record_action">2. Record Action Taken (Keep Under Institutional Review)</option>
+              <option value="update_remarks">3. Update Internal Reviewer Remarks Only</option>
+              <option value="resolve">4. Resolve Grievance (Provide Public Statement)</option>
+              <option value="escalate">5. Escalate to AICTE (Regulatory Intervention Required)</option>
+            </select>
+          </div>
+
+          <div class="mb-3" id="instActionTakenField" style="display: none;">
+            <label class="form-label fw-semibold text-primary">Concrete Action / Interim Measure Taken</label>
+            <textarea name="action_taken" class="form-control" rows="3" placeholder="Detail inquiry committee steps, student interviews, inspections, or corrective actions taken..."></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Internal Reviewer Remarks (Confidential to Staff)</label>
+            <textarea name="official_remarks" class="form-control" rows="2" placeholder="Notes for institutional records...">{{ complaint.official_remarks or '' }}</textarea>
+          </div>
+
+          <div class="mb-3" id="instResolveField" style="display: none;">
+            <label class="form-label fw-semibold text-success">Public Resolution Statement (Visible to Grievant)</label>
+            <textarea name="public_resolution_statement" class="form-control" rows="3" placeholder="Explain the concrete remedial action taken by the institution..."></textarea>
+          </div>
+
+          <div class="mb-3" id="instEscalateField" style="display: none;">
+            <label class="form-label fw-semibold text-danger">Escalation Rationale (Sent to AICTE Officers)</label>
+            <textarea name="escalation_reason" class="form-control" rows="3" placeholder="Why does this grievance require government/AICTE regulatory action?"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-warning fw-semibold">Commit Institutional Action</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 5: AICTE Regulatory Action -->
+<div class="modal fade" id="aicteActionModal" tabindex="-1" aria-labelledby="aicteActionModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('complaints.aicte_action', complaint_id=complaint.id) }}">
+        <div class="modal-header bg-danger bg-opacity-10 text-danger">
+          <h5 class="modal-title fw-bold" id="aicteActionModalLabel"><i class="bi bi-shield-shaded me-2"></i>AICTE Regulatory Determination</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Regulatory Determination</label>
+            <select name="action" id="aicteActionSelect" class="form-select" onchange="toggleAicteActionFields(this.value)" required>
+              <option value="investigate">1. Order Formal Investigation (Under Investigation)</option>
+              <option value="return_for_action">2. Return to Institution with Directives (Returned for Action)</option>
+              <option value="final_resolution">3. Record Statutory Final Resolution (Mark Resolved)</option>
+            </select>
+          </div>
+
+          <div class="mb-3" id="aicteRemarksField">
+            <label class="form-label fw-semibold">AICTE Directives &amp; Injunctions</label>
+            <textarea name="aicte_remarks" class="form-control" rows="3" placeholder="Provide instructions for institutional management or inquiry committee...">{{ complaint.aicte_remarks or '' }}</textarea>
+          </div>
+
+          <div class="mb-3" id="aicteResolveField" style="display: none;">
+            <label class="form-label fw-semibold text-success">Statutory Final Resolution Statement</label>
+            <textarea name="public_resolution_statement" class="form-control" rows="3" placeholder="Official AICTE closing determination visible to complainant and institution...">{{ complaint.public_resolution_statement or '' }}</textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger fw-semibold">Record Regulatory Order</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 6: AI-Assisted Department Routing Decision -->
+<div class="modal fade" id="routingModal" tabindex="-1" aria-labelledby="routingModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('complaints.route_decision', complaint_id=complaint.id) }}">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title fw-bold" id="routingModalLabel"><i class="bi bi-inboxes me-2"></i>Department Routing Decision</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="p-3 bg-light rounded border mb-3">
+            <div class="small text-muted">AI Recommendation:</div>
+            <div class="fw-bold text-primary fs-6">{{ complaint.suggested_destination or 'Pending' }}</div>
+            <div class="small text-secondary mt-1">{{ complaint.routing_reason }}</div>
+            {% if complaint.routing_confidence %}
+              <div class="small text-muted mt-1">Confidence Score: {{ (complaint.routing_confidence * 100) | round(1) }}%</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Review Action</label>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="action" id="routeActionAccept" value="accept" checked onchange="toggleRoutingOverride(false)">
+              <label class="form-check-label fw-semibold" for="routeActionAccept">
+                Accept AI Suggestion &mdash; Dispatch to <strong>{{ complaint.suggested_destination or 'Institutional Reviewer' }}</strong>
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="action" id="routeActionOverride" value="override" onchange="toggleRoutingOverride(true)">
+              <label class="form-check-label fw-semibold text-danger" for="routeActionOverride">
+                Override Destination &mdash; Assign to Different Department
+              </label>
+            </div>
+          </div>
+
+          <div id="routingOverrideFields" style="display: none;">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">Select Destination Department <span class="text-danger">*</span></label>
+              <select name="destination" class="form-select">
+                {% for d in destinations %}
+                  <option value="{{ d }}" {% if complaint.routed_destination == d or (not complaint.routed_destination and complaint.suggested_destination == d) %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold text-danger">Mandatory Reason for Overriding AI Suggestion <span class="text-danger">*</span></label>
+              <textarea name="reason" class="form-control" rows="3" placeholder="Explain why the AI suggestion is unsuitable for this specific complaint..."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary fw-semibold">Commit Routing Decision</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal 7: Shared Related Complaint Group Management -->
+<div class="modal fade" id="groupModal" tabindex="-1" aria-labelledby="groupModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title fw-bold" id="groupModalLabel"><i class="bi bi-diagram-3 me-2"></i>Shared Issue Group Management</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <ul class="nav nav-tabs mb-3" id="groupTab" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active fw-semibold" id="create-group-tab" data-bs-toggle="tab" data-bs-target="#create-group-pane" type="button" role="tab">
+              <i class="bi bi-plus-circle me-1"></i> Create New Shared Group
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link fw-semibold" id="link-group-tab" data-bs-toggle="tab" data-bs-target="#link-group-pane" type="button" role="tab">
+              <i class="bi bi-link me-1"></i> Link to Existing Group
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content" id="groupTabContent">
+          <!-- Pane 1: Create New Group -->
+          <div class="tab-pane fade show active" id="create-group-pane" role="tabpanel">
+            <form method="POST" action="{{ url_for('complaints.group_action', complaint_id=complaint.id) }}">
+              <input type="hidden" name="action" value="create_and_link">
+              
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Group Title / Master Issue Name <span class="text-danger">*</span></label>
+                <input type="text" name="group_title" class="form-control" value="Shared Issue: {{ complaint.title }}" required>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold text-danger">Identified Common Root Cause <span class="text-danger">*</span></label>
+                <textarea name="root_cause" class="form-control" rows="2" placeholder="Describe the single underlying failure, deficiency, or condition linking these complaints..." required></textarea>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-semibold">Master Issue Summary / Description</label>
+                <textarea name="group_description" class="form-control" rows="2" placeholder="General scope and impact of this shared grievance...">{{ complaint.description[:200] }}</textarea>
+              </div>
+
+              <!-- Overlapping complaints to simultaneously link -->
+              {% if overlaps %}
+                <div class="mb-3">
+                  <label class="form-label fw-semibold small text-dark">Simultaneously Link Detected Overlaps into this Group:</label>
+                  <div class="border rounded p-2 bg-light" style="max-height: 180px; overflow-y: auto;">
+                    {% for o in overlaps %}
+                      {% set other = o.second_complaint if o.first_complaint_id == complaint.id else o.first_complaint %}
+                      <div class="form-check small py-1">
+                        <input class="form-check-input" type="checkbox" name="linked_complaint_ids" value="{{ other.id }}" id="link_chk_{{ other.id }}" {% if o.review_status == 'Confirmed Related' %}checked{% endif %}>
+                        <label class="form-check-label text-dark" for="link_chk_{{ other.id }}">
+                          <strong>{{ other.reference_number }}</strong> &mdash; {{ other.title[:45] }}
+                          <span class="badge bg-secondary ms-1">{{ other.status }}</span>
+                        </label>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endif %}
+
+              <div class="small text-muted mb-3">
+                <i class="bi bi-shield-lock text-success me-1"></i>
+                Individual complaint records, evidence files, and student identities are preserved without merger.
+              </div>
+
+              <button type="submit" class="btn btn-primary fw-semibold">Create Group &amp; Link Complaints</button>
+            </form>
+          </div>
+
+          <!-- Pane 2: Link to Existing Group -->
+          <div class="tab-pane fade" id="link-group-pane" role="tabpanel">
+            <form method="POST" action="{{ url_for('complaints.group_action', complaint_id=complaint.id) }}">
+              <input type="hidden" name="action" value="link_existing">
+
+              {% if existing_groups %}
+                <div class="mb-3">
+                  <label class="form-label fw-semibold">Select Existing Active Shared Issue Group <span class="text-danger">*</span></label>
+                  <select name="existing_group_id" class="form-select" required>
+                    <option value="" disabled selected>-- Choose Shared Group --</option>
+                    {% for grp in existing_groups %}
+                      <option value="{{ grp.id }}">
+                        {{ grp.group_reference }} &mdash; {{ grp.title }} ({{ grp.category }}) [{{ grp.status }}]
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label fw-semibold">Reviewer Justification for Linking</label>
+                  <textarea name="reason" class="form-control" rows="2" placeholder="Why does this complaint belong to the selected shared issue group?"></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-info text-dark fw-semibold">Link to Selected Group</button>
+              {% else %}
+                <div class="alert alert-secondary text-center py-4">
+                  <i class="bi bi-folder-x fs-2 d-block mb-2"></i>
+                  No shared complaint groups have been created yet. Use the "Create New Shared Group" tab above.
+                </div>
+              {% endif %}
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleInstActionFields(action) {
+    const actField = document.getElementById('instActionTakenField');
+    if (actField) actField.style.display = (action === 'record_action') ? 'block' : 'none';
+    document.getElementById('instResolveField').style.display = (action === 'resolve') ? 'block' : 'none';
+    document.getElementById('instEscalateField').style.display = (action === 'escalate') ? 'block' : 'none';
+  }
+  function toggleAicteActionFields(action) {
+    document.getElementById('aicteResolveField').style.display = (action === 'final_resolution') ? 'block' : 'none';
+  }
+  function toggleRoutingOverride(show) {
+    document.getElementById('routingOverrideFields').style.display = show ? 'block' : 'none';
+  }
+  function toggleResControls(state) {
+    const pubBox = document.getElementById('publicStatementBox');
+    const grpBox = document.getElementById('groupPropagationBox');
+    if (pubBox) {
+      pubBox.style.display = (state === 'Resolved' || state === 'Partially Resolved') ? 'block' : 'block';
+    }
+    if (grpBox) {
+      grpBox.style.display = (state === 'Resolved') ? 'block' : 'none';
+    }
+  }
+</script>
+{% endblock %}

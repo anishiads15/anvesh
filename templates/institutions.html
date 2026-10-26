@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}Institutions Directory — AICTE Monitoring Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
+  <div>
+    <h4 class="fw-bold mb-1 text-dark">Technical Institution Directory</h4>
+    <p class="text-muted small mb-0">Approved technical colleges and universities across AICTE regions with historical grievance tracking and overlap intelligence.</p>
+  </div>
+  <div class="btn-group btn-group-sm" role="group">
+    <button type="button" class="btn btn-outline-primary active" id="btnViewCards" onclick="toggleView('cards')">
+      <i class="bi bi-grid-fill me-1"></i> Card Grid
+    </button>
+    <button type="button" class="btn btn-outline-primary" id="btnViewTable" onclick="toggleView('table')">
+      <i class="bi bi-table me-1"></i> Table View
+    </button>
+  </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="gov-card mb-4">
+  <div class="gov-card-body py-3">
+    <form method="GET" action="{{ url_for('institutions.index') }}" class="row g-2 align-items-center">
+      <div class="col-md-5">
+        <label class="form-label small text-muted mb-1">Search Institution or Code</label>
+        <div class="input-group input-group-sm">
+          <span class="input-group-text bg-white"><i class="bi bi-search text-muted"></i></span>
+          <input type="text" name="q" class="form-control" placeholder="Search name, AICTE code, district, or state..." value="{{ search_query or '' }}">
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label small text-muted mb-1">Filter State</label>
+        <select name="state" class="form-select form-select-sm">
+          <option value="">All States</option>
+          {% for st in all_states %}
+            <option value="{{ st }}" {% if selected_state == st %}selected{% endif %}>{{ st }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label small text-muted mb-1">Type</label>
+        <select name="type" class="form-select form-select-sm">
+          <option value="">All Types</option>
+          {% for tp in all_types %}
+            <option value="{{ tp }}" {% if selected_type == tp %}selected{% endif %}>{{ tp }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-2 d-flex align-items-end gap-1">
+        <button type="submit" class="btn btn-gov-primary btn-sm w-100">
+          <i class="bi bi-funnel me-1"></i> Filter
+        </button>
+        <a href="{{ url_for('institutions.index') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Card Grid View (Visual match to Image 7) -->
+<div id="institutionsCardGrid" class="row g-3 mb-4">
+  {% if institutions %}
+    {% for item in institutions %}
+      {% set inst = item.institution %}
+      <div class="col-lg-4 col-md-6">
+        <div class="gov-card h-100 mb-0 position-relative overflow-hidden">
+          <div class="gov-card-body p-3 d-flex flex-column justify-content-between h-100">
+            <div>
+              <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+                <a href="{{ url_for('institutions.detail', institution_id=inst.id) }}" class="fw-bold text-dark text-decoration-none fs-6 text-truncate" title="{{ inst.name }}">
+                  {{ inst.name }}
+                </a>
+              </div>
+              <div class="small text-muted mb-1">
+                <i class="bi bi-geo-alt me-1 text-danger"></i> {{ inst.district }}, {{ inst.state }} {% if inst.region %}<span class="text-secondary">[{{ inst.region }}]</span>{% endif %}
+              </div>
+              <div class="small text-secondary mb-3">
+                <span class="badge bg-light text-dark border">Type: {{ inst.institution_type or 'Technical Institution' }}</span>
+                <code class="ms-1 small">{{ inst.code }}</code>
+              </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="pt-2 border-top d-flex align-items-center justify-content-between">
+              <div class="d-flex align-items-center gap-3">
+                <div title="Total Registered Grievances">
+                  <span class="fw-bold fs-6 text-dark">{{ item.total_complaints }}</span>
+                  <span class="text-muted small d-block" style="font-size: 0.68rem;">Total</span>
+                </div>
+                <div title="Active / Under Review">
+                  <span class="fw-bold fs-6 text-warning">{{ item.open_complaints }}</span>
+                  <span class="text-muted small d-block" style="font-size: 0.68rem;">Active</span>
+                </div>
+                {% if item.overdue_complaints > 0 %}
+                <div title="Statutorily Overdue (>30d)">
+                  <span class="fw-bold fs-6 text-danger"><span class="pulse-dot pulse-dot-red"></span>{{ item.overdue_complaints }}</span>
+                  <span class="text-danger small d-block" style="font-size: 0.68rem;">Overdue</span>
+                </div>
+                {% endif %}
+                {% if item.pending_overlaps > 0 %}
+                <div title="AI Flagged Overlaps">
+                  <span class="fw-bold fs-6 text-info"><i class="bi bi-diagram-3-fill"></i> {{ item.pending_overlaps }}</span>
+                  <span class="text-info small d-block" style="font-size: 0.68rem;">Overlap</span>
+                </div>
+                {% endif %}
+              </div>
+              <a href="{{ url_for('institutions.detail', institution_id=inst.id) }}" class="btn btn-sm btn-outline-primary py-1 px-2 fw-semibold" style="font-size: 0.78rem;">
+                History &rarr;
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="col-12">
+      <div class="p-5 text-center text-muted bg-white rounded border">No institutions match the filter criteria.</div>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Table View (Alternative) -->
+<div id="institutionsTableView" class="gov-card d-none">
+  <div class="gov-card-header flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+      <h6 class="gov-card-title mb-0">Institutions List</h6>
+      <span class="badge bg-light text-dark border"><span data-table-count>{{ institutions | length }}</span> institutions</span>
+    </div>
+    <div class="input-group input-group-sm ms-auto" style="width: 240px;">
+      <span class="input-group-text bg-white border-end-0"><i class="bi bi-filter text-muted"></i></span>
+      <input type="text" class="form-control border-start-0" data-table-search="#institutionsTable" placeholder="Instant filter colleges..." aria-label="Instant filter colleges">
+    </div>
+  </div>
+  <div class="gov-card-body p-0">
+    {% if institutions %}
+      <div class="table-responsive">
+        <table class="gov-table mb-0" id="institutionsTable">
+          <thead>
+            <tr>
+              <th>Institution Details</th>
+              <th>Type &amp; Region</th>
+              <th>Total Complaints</th>
+              <th>Active / Resolved</th>
+              <th>Pending Overlaps</th>
+              <th>Recent Activity</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in institutions %}
+              {% set inst = item.institution %}
+              <tr>
+                <td>
+                  <a href="{{ url_for('institutions.detail', institution_id=inst.id) }}" class="fw-bold text-dark text-decoration-none">
+                    {{ inst.name }}
+                  </a>
+                  <div class="small text-muted">AICTE Code: <code>{{ inst.code }}</code></div>
+                </td>
+                <td>
+                  <div class="fw-semibold text-secondary small">{{ inst.institution_type }}</div>
+                  <div class="small text-muted">{{ inst.district }}, {{ inst.state }}</div>
+                </td>
+                <td>
+                  <span class="badge bg-light text-dark border fs-6">{{ item.total_complaints }}</span>
+                </td>
+                <td>
+                  <span class="badge badge-status-open">{{ item.open_complaints }} Active</span>
+                  <span class="badge badge-status-resolved">{{ item.resolved_complaints }} Resolved</span>
+                </td>
+                <td>
+                  {% if item.pending_overlaps > 0 %}
+                    <a href="{{ url_for('overlaps.index', institution_id=inst.id) }}" class="badge badge-possible-overlap text-decoration-none">
+                      <i class="bi bi-exclamation-triangle-fill"></i> {{ item.pending_overlaps }} Awaiting Review
+                    </a>
+                  {% else %}
+                    <span class="small text-muted"><i class="bi bi-check me-1"></i>0 Pending</span>
+                  {% endif %}
+                </td>
+                <td style="max-width: 220px;">
+                  {% if item.recent_complaints %}
+                    <div class="small text-truncate" title="{{ item.recent_complaints[0].title }}">
+                      &bull; {{ item.recent_complaints[0].title }}
+                    </div>
+                    <div class="text-muted" style="font-size: 0.72rem;">{{ item.recent_complaints[0].created_at.strftime('%d %b %Y') if item.recent_complaints[0].created_at else '' }}</div>
+                  {% else %}
+                    <span class="text-muted small">No complaints</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <a href="{{ url_for('institutions.detail', institution_id=inst.id) }}" class="btn btn-sm btn-outline-primary">
+                    View Profile
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="p-5 text-center text-muted">No institutions match the filter criteria.</div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  function toggleView(viewType) {
+    const cardGrid = document.getElementById('institutionsCardGrid');
+    const tableView = document.getElementById('institutionsTableView');
+    const btnCards = document.getElementById('btnViewCards');
+    const btnTable = document.getElementById('btnViewTable');
+
+    if (viewType === 'table') {
+      cardGrid.classList.add('d-none');
+      tableView.classList.remove('d-none');
+      btnTable.classList.add('active');
+      btnCards.classList.remove('active');
+    } else {
+      tableView.classList.add('d-none');
+      cardGrid.classList.remove('d-none');
+      btnCards.classList.add('active');
+      btnTable.classList.remove('active');
+    }
+  }
+</script>
+{% endblock %}

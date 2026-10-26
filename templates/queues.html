@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+
+{% block title %}Department Review Queues — AICTE Monitoring Portal{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
+  <div>
+    <h3 class="fw-bold text-dark mb-1"><i class="bi bi-inboxes text-primary me-2"></i>Department Review Queues</h3>
+    <p class="text-muted small mb-0">Controlled multi-tier routing: AI recommendations verified by authorized reviewers before departmental dispatch.</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('complaints.index') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-list-ul me-1"></i> Full Complaint Register
+    </a>
+  </div>
+</div>
+
+<!-- Queue Navigation Tabs with Live Counts -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body p-2 bg-light rounded">
+    <ul class="nav nav-pills flex-wrap gap-2">
+      {% if not user_bureau_code %}
+      <li class="nav-item">
+        <a class="nav-link {% if current_queue == 'all' %}active fw-semibold{% endif %}" href="{{ url_for('complaints.review_queues', queue_type='all') }}">
+          <i class="bi bi-collection me-1"></i> All Queues
+          <span class="badge bg-secondary ms-1">{{ counts.all }}</span>
+        </a>
+      </li>
+      {% endif %}
+      {% if not user_bureau_code or user_bureau_code == 'pgrc' %}
+      <li class="nav-item">
+        <a class="nav-link {% if current_queue == 'pgrc' %}active fw-semibold{% endif %}" href="{{ url_for('complaints.review_queues', queue_type='pgrc') }}">
+          <i class="bi bi-people-fill me-1"></i> PGRC Grievance
+          <span class="badge bg-primary ms-1">{{ counts.pgrc }}</span>
+        </a>
+      </li>
+      {% endif %}
+      {% if not user_bureau_code or user_bureau_code == 'rb' %}
+      <li class="nav-item">
+        <a class="nav-link {% if current_queue == 'rb' %}active fw-semibold{% endif %}" href="{{ url_for('complaints.review_queues', queue_type='rb') }}">
+          <i class="bi bi-journal-check me-1"></i> Regulation Bureau (RB)
+          <span class="badge bg-danger ms-1">{{ counts.rb }}</span>
+        </a>
+      </li>
+      {% endif %}
+      {% if not user_bureau_code or user_bureau_code == 'ab' %}
+      <li class="nav-item">
+        <a class="nav-link {% if current_queue == 'ab' %}active fw-semibold{% endif %}" href="{{ url_for('complaints.review_queues', queue_type='ab') }}">
+          <i class="bi bi-patch-check me-1"></i> Approval Bureau (AB)
+          <span class="badge bg-success ms-1">{{ counts.ab }}</span>
+        </a>
+      </li>
+      {% endif %}
+      {% if not user_bureau_code or user_bureau_code == 'papb' %}
+      <li class="nav-item">
+        <a class="nav-link {% if current_queue == 'papb' %}active fw-semibold{% endif %}" href="{{ url_for('complaints.review_queues', queue_type='papb') }}">
+          <i class="bi bi-mortarboard me-1"></i> Policy &amp; Academic (PAPB)
+          <span class="badge bg-info text-dark ms-1">{{ counts.papb }}</span>
+        </a>
+      </li>
+      {% endif %}
+      {% if not user_bureau_code or user_bureau_code == 'fb' %}
+      <li class="nav-item">
+        <a class="nav-link {% if current_queue == 'fb' %}active fw-semibold{% endif %}" href="{{ url_for('complaints.review_queues', queue_type='fb') }}">
+          <i class="bi bi-cash-stack me-1"></i> Finance Bureau (FB)
+          <span class="badge bg-warning text-dark ms-1">{{ counts.fb }}</span>
+        </a>
+      </li>
+      {% endif %}
+      {% if not user_bureau_code or user_bureau_code == 'arc' %}
+      <li class="nav-item">
+        <a class="nav-link {% if current_queue == 'arc' %}active fw-semibold{% endif %}" href="{{ url_for('complaints.review_queues', queue_type='arc') }}">
+          <i class="bi bi-shield-exclamation me-1"></i> Anti-Ragging Cell (ARC)
+          <span class="badge bg-danger ms-1">{{ counts.arc }}</span>
+        </a>
+      </li>
+      {% endif %}
+      {% if not user_bureau_code or user_bureau_code == 'sdc' %}
+      <li class="nav-item">
+        <a class="nav-link {% if current_queue == 'sdc' %}active fw-semibold{% endif %}" href="{{ url_for('complaints.review_queues', queue_type='sdc') }}">
+          <i class="bi bi-tools me-1"></i> Skill Development (SDC)
+          <span class="badge bg-secondary ms-1">{{ counts.sdc }}</span>
+        </a>
+      </li>
+      {% endif %}
+      {% if not user_bureau_code %}
+      <li class="nav-item">
+        <a class="nav-link {% if current_queue == 'rc' %}active fw-semibold{% endif %}" href="{{ url_for('complaints.review_queues', queue_type='rc') }}">
+          <i class="bi bi-shield-check me-1"></i> RC Compliance
+          <span class="badge bg-danger ms-1">{{ counts.rc }}</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if current_queue == 'institutional' %}active fw-semibold{% endif %}" href="{{ url_for('complaints.review_queues', queue_type='institutional') }}">
+          <i class="bi bi-building me-1"></i> Institutional Review
+          <span class="badge bg-warning text-dark ms-1">{{ counts.institutional }}</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if current_queue == 'manual' %}active fw-semibold{% endif %}" href="{{ url_for('complaints.review_queues', queue_type='manual') }}">
+          <i class="bi bi-question-circle me-1"></i> Manual / Triage
+          <span class="badge bg-secondary ms-1">{{ counts.manual }}</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if current_queue == 'unrouted' %}active fw-semibold text-danger{% endif %}" href="{{ url_for('complaints.review_queues', queue_type='unrouted') }}">
+          <i class="bi bi-exclamation-circle me-1"></i> Needs Routing
+          <span class="badge bg-danger ms-1">{{ counts.unrouted }}</span>
+        </a>
+      </li>
+      {% endif %}
+    </ul>
+  </div>
+</div>
+
+<!-- Department Descriptions Banner -->
+{% if current_queue == 'pgrc' %}
+  <div class="alert alert-primary shadow-sm border-2 d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-people-fill fs-2 text-primary"></i>
+    <div>
+      <h6 class="fw-bold mb-0 text-primary">Public Grievance Redressal Committee (PGRC) Dedicated Queue</h6>
+      <div class="small text-dark">Handles public grievances, student harassment/ragging, scholarships, fee irregularities, faculty misconduct, and student welfare matters under AICTE regulations.</div>
+    </div>
+  </div>
+{% elif current_queue == 'rb' %}
+  <div class="alert alert-danger shadow-sm border-2 d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-journal-check fs-2 text-danger"></i>
+    <div>
+      <h6 class="fw-bold mb-0 text-danger">Regulation Bureau (RB) Queue</h6>
+      <div class="small text-dark">Statutory oversight over capitation fee overcharging, withholding of original student certificates, governance malpractice, and regulatory compliance.</div>
+    </div>
+  </div>
+{% elif current_queue == 'ab' %}
+  <div class="alert alert-success shadow-sm border-2 d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-patch-check fs-2 text-success"></i>
+    <div>
+      <h6 class="fw-bold mb-0 text-success">Approval Bureau (AB) Queue</h6>
+      <div class="small text-dark">Handles extension of approvals, unapproved courses, excess intake violations, and specialized laboratory infrastructure deficit compliance.</div>
+    </div>
+  </div>
+{% elif current_queue == 'papb' %}
+  <div class="alert alert-info shadow-sm border-2 d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-mortarboard fs-2 text-info"></i>
+    <div>
+      <h6 class="fw-bold mb-0 text-info">Policy &amp; Academic Planning Bureau (PAPB) Queue</h6>
+      <div class="small text-dark">Oversees curriculum framework implementation, admissions counseling discrepancies, internship mandates, and academic policy compliance.</div>
+    </div>
+  </div>
+{% elif current_queue == 'fb' %}
+  <div class="alert alert-warning shadow-sm border-2 d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-cash-stack fs-2 text-warning"></i>
+    <div>
+      <h6 class="fw-bold mb-0 text-dark">Finance Bureau (FB) Queue</h6>
+      <div class="small text-dark">Investigates institutional misappropriation of government grant funds, MODROBS funding diversions, and financial audit discrepancies.</div>
+    </div>
+  </div>
+{% elif current_queue == 'arc' %}
+  <div class="alert alert-danger shadow-sm border-2 d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-shield-exclamation fs-2 text-danger"></i>
+    <div>
+      <h6 class="fw-bold mb-0 text-danger">Anti-Ragging Cell (ARC) Priority Queue</h6>
+      <div class="small text-dark">Zero-tolerance monitoring for ragging, physical/verbal intimidation, hostel violations, and campus safety enforcement.</div>
+    </div>
+  </div>
+{% elif current_queue == 'sdc' %}
+  <div class="alert alert-secondary shadow-sm border-2 d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-tools fs-2 text-secondary"></i>
+    <div>
+      <h6 class="fw-bold mb-0 text-dark">Skill Development Cell (SDC) Queue</h6>
+      <div class="small text-dark">Monitors vocational and PMKVY skill development schemes, beneficiary stipend distribution, and training center compliance.</div>
+    </div>
+  </div>
+{% elif current_queue == 'rc' %}
+  <div class="alert alert-danger shadow-sm border-2 d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-shield-check fs-2 text-danger"></i>
+    <div>
+      <h6 class="fw-bold mb-0 text-danger">Regional Committee (RC) Regulatory Compliance Queue</h6>
+      <div class="small text-dark">Handles institutional compliance with the AICTE Approval Process Handbook (APH), unapproved courses/intake, land/building norm violations, and statutory inspections.</div>
+    </div>
+  </div>
+{% elif current_queue == 'institutional' %}
+  <div class="alert alert-warning shadow-sm border-2 d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-building fs-2 text-warning"></i>
+    <div>
+      <h6 class="fw-bold mb-0 text-dark">Institutional Reviewer Queue</h6>
+      <div class="small text-secondary">Local campus operations requiring internal college resolution: laboratory maintenance, drinking water/sanitation, hostel infrastructure, and departmental facilities.</div>
+    </div>
+  </div>
+{% elif current_queue == 'manual' %}
+  <div class="alert alert-secondary shadow-sm border-2 d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-question-circle fs-2 text-secondary"></i>
+    <div>
+      <h6 class="fw-bold mb-0 text-dark">Manual Review &amp; Ambiguous Triage Queue</h6>
+      <div class="small text-secondary">Complaints requiring human clarification, low AI confidence scores, multi-jurisdiction disputes, or unclassified grievances.</div>
+    </div>
+  </div>
+{% elif current_queue == 'unrouted' %}
+  <div class="alert alert-danger shadow-sm border-2 d-flex align-items-center gap-3 mb-4">
+    <i class="bi bi-exclamation-triangle-fill fs-2 text-danger"></i>
+    <div>
+      <h6 class="fw-bold mb-0 text-danger">Awaiting Initial Routing Confirmation</h6>
+      <div class="small text-dark">These complaints have an AI routing recommendation but require an authorized reviewer to accept or modify the routing destination.</div>
+    </div>
+  </div>
+{% endif %}
+
+<!-- Filters Bar -->
+<div class="gov-card mb-4 p-3">
+  <form method="GET" action="{{ url_for('complaints.review_queues', queue_type=current_queue) }}" class="row g-2 align-items-center">
+    <div class="col-md-4">
+      <label class="form-label small text-muted mb-1">Filter by Status</label>
+      <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="All">All Statuses</option>
+        {% for s in statuses %}
+          <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small text-muted mb-1">Filter by Priority</label>
+      <select name="priority" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="All">All Priorities</option>
+        {% for p in priorities %}
+          <option value="{{ p }}" {% if selected_priority == p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-4 d-flex align-items-end">
+      <a href="{{ url_for('complaints.review_queues', queue_type=current_queue) }}" class="btn btn-outline-secondary btn-sm w-100">Reset Filters</a>
+    </div>
+  </form>
+</div>
+
+<!-- Complaints Queue Table -->
+<div class="gov-card">
+  <div class="gov-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h6 class="gov-card-title mb-0">
+      <i class="bi bi-table me-2 text-primary"></i>
+      Queue Items (<span data-table-count>{{ complaints | length }}</span>)
+    </h6>
+    <div class="input-group input-group-sm" style="width: 240px;">
+      <span class="input-group-text bg-white border-end-0"><i class="bi bi-filter text-muted"></i></span>
+      <input type="text" class="form-control border-start-0" data-table-search="#queuesTable" placeholder="Instant filter queue..." aria-label="Instant filter">
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="gov-table mb-0" id="queuesTable">
+      <thead class="table-light">
+        <tr>
+          <th>Reference &amp; Title</th>
+          <th>Institution</th>
+          <th>AI Routing Suggestion</th>
+          <th>Confirmed Route</th>
+          <th>Priority</th>
+          <th>Status</th>
+          <th>Age</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if complaints %}
+          {% for c in complaints %}
+            <tr>
+              <td>
+                <a href="{{ url_for('complaints.detail', complaint_id=c.id) }}" class="fw-bold text-dark text-decoration-none">
+                  {{ c.reference_number }}
+                </a>
+                <div class="small text-secondary text-truncate" style="max-width: 260px;" title="{{ c.title }}">
+                  {{ c.title }}
+                </div>
+                {% if c.related_group %}
+                  <span class="badge bg-info bg-opacity-25 text-dark border border-info border-opacity-50 mt-1" style="font-size: 0.68rem;">
+                    <i class="bi bi-link-45deg"></i> Group: {{ c.related_group.group_reference }}
+                  </span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="small fw-semibold text-dark">{{ c.institution.name if c.institution else 'N/A' }}</div>
+                <div class="text-muted" style="font-size: 0.72rem;">Code: {{ c.institution.code if c.institution else 'N/A' }}</div>
+              </td>
+              <td>
+                <span class="badge bg-light text-dark border fw-normal">
+                  <i class="bi bi-cpu text-primary me-1"></i>{{ c.suggested_destination or 'Pending' }}
+                </span>
+                {% if c.routing_confidence %}
+                  <div class="text-muted mt-1" style="font-size: 0.70rem;">Confidence: {{ (c.routing_confidence * 100) | round(0) }}%</div>
+                {% endif %}
+              </td>
+              <td>
+                {% if c.routed_destination %}
+                  <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
+                    <i class="bi bi-check-circle me-1"></i>{{ c.routed_destination }}
+                  </span>
+                  <div class="text-muted" style="font-size: 0.68rem;">{{ c.routing_decision or 'Confirmed' }}</div>
+                {% else %}
+                  <span class="badge bg-warning bg-opacity-25 text-dark border border-warning">
+                    <i class="bi bi-hourglass-split me-1"></i>Awaiting Decision
+                  </span>
+                {% endif %}
+              </td>
+              <td>
+                {% if c.priority == 'Critical' %}
+                  <span class="badge badge-priority-critical"><i class="bi bi-lightning-fill"></i> Critical</span>
+                {% elif c.priority == 'High' %}
+                  <span class="badge badge-priority-high">High</span>
+                {% elif c.priority == 'Medium' %}
+                  <span class="badge badge-priority-medium">Medium</span>
+                {% else %}
+                  <span class="badge badge-priority-low">Low</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if c.status == 'Resolved' %}
+                  <span class="badge bg-success">Resolved</span>
+                {% elif c.status == 'Under Investigation' %}
+                  <span class="badge bg-info text-dark">Under Investigation</span>
+                {% elif c.status in ['Escalated', 'Escalated to AICTE'] %}
+                  <span class="badge bg-danger">Escalated</span>
+                {% elif c.status in ['Under Review', 'Under Institutional Review'] %}
+                  <span class="badge bg-warning text-dark">Under Review</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ c.status }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="small text-muted" title="{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '' }}">
+                  {{ c.created_at.strftime('%d %b') if c.created_at else '' }}
+                </span>
+              </td>
+              <td class="text-end">
+                <a href="{{ url_for('complaints.detail', complaint_id=c.id) }}" class="btn btn-outline-primary btn-sm py-1 px-2">
+                  <i class="bi bi-box-arrow-up-right"></i> Review
+                </a>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="8" class="text-center py-5 text-muted">
+              <i class="bi bi-check2-circle fs-1 text-success d-block mb-2"></i>
+              No complaints currently in this queue matching the selected criteria.
+            </td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

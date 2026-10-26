@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block title %}Overlap Detection &amp; Deduplication Review Queue — AICTE Monitoring Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
+  <div>
+    <h4 class="fw-bold mb-1 text-dark">Potential Complaint Overlap Review Queue</h4>
+    <p class="text-muted small mb-0">
+      AI-assisted deduplication interface. Identifies grievances describing the same incident across different channels, phrasing, or reporters.
+    </p>
+  </div>
+  <div class="d-flex gap-2">
+    {% if g.current_user.is_super_admin or g.current_user.is_reviewer %}
+      <form method="POST" action="{{ url_for('overlaps.recalculate') }}" onsubmit="return confirm('Recalculate overlap relationships across all eligible complaints? Human-reviewed decisions will be preserved.');">
+        <button type="submit" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-arrow-repeat me-1"></i> Recalculate Overlaps
+        </button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Status Tabs Bar -->
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="{{ url_for('overlaps.index', status='Pending Review', strength=selected_strength, institution_id=selected_institution) }}"
+     class="btn btn-sm {% if selected_status == 'Pending Review' %}btn-warning text-dark fw-bold{% else %}btn-outline-secondary{% endif %}">
+    <i class="bi bi-hourglass-split me-1"></i> Pending Review
+    <span class="badge bg-dark ms-1">{{ total_pending }}</span>
+  </a>
+
+  <a href="{{ url_for('overlaps.index', status='Confirmed Related', strength=selected_strength, institution_id=selected_institution) }}"
+     class="btn btn-sm {% if selected_status == 'Confirmed Related' %}btn-success fw-bold{% else %}btn-outline-secondary{% endif %}">
+    <i class="bi bi-link-45deg me-1"></i> Human-Confirmed Related
+    <span class="badge bg-light text-dark ms-1">{{ total_confirmed }}</span>
+  </a>
+
+  <a href="{{ url_for('overlaps.index', status='Rejected Not Related', strength=selected_strength, institution_id=selected_institution) }}"
+     class="btn btn-sm {% if selected_status == 'Rejected Not Related' %}btn-secondary fw-bold{% else %}btn-outline-secondary{% endif %}">
+    <i class="bi bi-x-circle me-1"></i> Rejected / Not Related
+    <span class="badge bg-light text-dark ms-1">{{ total_rejected }}</span>
+  </a>
+
+  <a href="{{ url_for('overlaps.index', status='All', strength=selected_strength, institution_id=selected_institution) }}"
+     class="btn btn-sm {% if selected_status == 'All' %}btn-dark fw-bold{% else %}btn-outline-secondary{% endif %}">
+    All Records
+  </a>
+</div>
+
+<!-- Filter Box -->
+<div class="gov-card mb-4">
+  <div class="gov-card-body py-3">
+    <form method="GET" action="{{ url_for('overlaps.index') }}" class="row g-2 align-items-center">
+      <input type="hidden" name="status" value="{{ selected_status }}">
+
+      <div class="col-md-4">
+        <label class="form-label small text-muted mb-1">Filter by Overlap Strength</label>
+        <select name="strength" class="form-select form-select-sm">
+          <option value="">All Strengths</option>
+          <option value="Strong Potential Overlap" {% if selected_strength == 'Strong Potential Overlap' %}selected{% endif %}>
+            Strong Potential Overlap (Score &ge; 0.80)
+          </option>
+          <option value="Possible Overlap" {% if selected_strength == 'Possible Overlap' %}selected{% endif %}>
+            Possible Overlap (0.50 &le; Score &lt; 0.80)
+          </option>
+        </select>
+      </div>
+
+      {% if not g.current_user.is_institution_admin %}
+      <div class="col-md-5">
+        <label class="form-label small text-muted mb-1">Filter by Institution</label>
+        <select name="institution_id" class="form-select form-select-sm">
+          <option value="">All Institutions</option>
+          {% for inst in institutions %}
+            <option value="{{ inst.id }}" {% if selected_institution == inst.id %}selected{% endif %}>
+              {{ inst.name }} ({{ inst.code }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <div class="col-md-3 d-flex align-items-end gap-2">
+        <button type="submit" class="btn btn-gov-primary btn-sm w-100">
+          <i class="bi bi-funnel me-1"></i> Apply Filters
+        </button>
+        <a href="{{ url_for('overlaps.index', status=selected_status) }}" class="btn btn-outline-secondary btn-sm">Reset</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Overlaps List Queue -->
+{% if overlaps %}
+  <div class="d-grid gap-4">
+    {% for o in overlaps %}
+      <div class="gov-card {% if o.relationship_type == 'Strong Potential Overlap' and o.review_status != 'Rejected Not Related' %}overlap-strong-highlight{% elif o.relationship_type == 'Possible Overlap' and o.review_status != 'Rejected Not Related' %}overlap-possible-highlight{% endif %}">
+        <!-- Header with Score & Status -->
+        <div class="gov-card-header bg-white">
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <!-- Overlap Badge -->
+            {% if o.review_status == 'Confirmed Related' %}
+              <span class="badge-confirmed-related"><i class="bi bi-link-45deg"></i> HUMAN-CONFIRMED RELATED</span>
+            {% elif o.review_status == 'Rejected Not Related' %}
+              <span class="badge bg-secondary"><i class="bi bi-x-circle me-1"></i> MARKED NOT RELATED</span>
+            {% elif o.relationship_type == 'Strong Potential Overlap' %}
+              <span class="badge-strong-overlap"><i class="bi bi-exclamation-octagon-fill"></i> STRONG POTENTIAL OVERLAP</span>
+            {% else %}
+              <span class="badge-possible-overlap"><i class="bi bi-exclamation-triangle-fill"></i> POSSIBLE OVERLAP — REVIEW REQUIRED</span>
+            {% endif %}
+
+            <span class="badge bg-dark fw-bold">{{ (o.similarity_score * 100) | round(1) }}% Match Score</span>
+            <span class="small text-muted ms-2"><i class="bi bi-cpu me-1"></i>{{ o.algorithm_version }}</span>
+          </div>
+
+          <div class="small text-muted">
+            Detected: {{ o.created_at.strftime('%d %b %Y, %H:%M') if o.created_at else '' }}
+          </div>
+        </div>
+
+        <div class="gov-card-body">
+          <!-- Comparative Side-by-Side Cards -->
+          <div class="row g-3 mb-3">
+            <!-- Complaint A -->
+            <div class="col-md-6">
+              <div class="p-3 bg-white rounded border h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <span class="badge bg-primary bg-opacity-10 text-primary fw-bold">Complaint A (#{{ o.first_complaint_id }})</span>
+                  <a href="{{ url_for('complaints.detail', complaint_id=o.first_complaint_id) }}" class="btn btn-sm btn-outline-primary py-0 px-2" target="_blank">
+                    Open Complaint A <i class="bi bi-box-arrow-up-right"></i>
+                  </a>
+                </div>
+                <h6 class="fw-bold text-dark mb-1">{{ o.first_complaint.title }}</h6>
+                <div class="small text-muted mb-2">
+                  <i class="bi bi-building me-1"></i>{{ o.first_complaint.institution.name }} ({{ o.first_complaint.institution.code }})
+                </div>
+                <div class="small text-muted mb-2">
+                  <span class="badge bg-light text-dark border">{{ o.first_complaint.category }}</span>
+                  <span class="badge bg-light text-secondary border">{{ o.first_complaint.source_channel }}</span>
+                  <span class="badge bg-light text-secondary border">Status: {{ o.first_complaint.status }}</span>
+                </div>
+                <div class="p-2 bg-light rounded text-secondary small" style="white-space: pre-wrap; max-height: 120px; overflow-y: auto;">
+{{ o.first_complaint.description }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Complaint B -->
+            <div class="col-md-6">
+              <div class="p-3 bg-white rounded border h-100 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <span class="badge bg-info bg-opacity-10 text-info fw-bold">Complaint B (#{{ o.second_complaint_id }})</span>
+                  <a href="{{ url_for('complaints.detail', complaint_id=o.second_complaint_id) }}" class="btn btn-sm btn-outline-primary py-0 px-2" target="_blank">
+                    Open Complaint B <i class="bi bi-box-arrow-up-right"></i>
+                  </a>
+                </div>
+                <h6 class="fw-bold text-dark mb-1">{{ o.second_complaint.title }}</h6>
+                <div class="small text-muted mb-2">
+                  <i class="bi bi-building me-1"></i>{{ o.second_complaint.institution.name }} ({{ o.second_complaint.institution.code }})
+                </div>
+                <div class="small text-muted mb-2">
+                  <span class="badge bg-light text-dark border">{{ o.second_complaint.category }}</span>
+                  <span class="badge bg-light text-secondary border">{{ o.second_complaint.source_channel }}</span>
+                  <span class="badge bg-light text-secondary border">Status: {{ o.second_complaint.status }}</span>
+                </div>
+                <div class="p-2 bg-light rounded text-secondary small" style="white-space: pre-wrap; max-height: 120px; overflow-y: auto;">
+{{ o.second_complaint.description }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Matching Evidence and Detailed Scoring Breakdown -->
+          <div class="bg-light p-3 rounded border mb-3">
+            <h6 class="fw-bold text-dark mb-1 small text-uppercase">
+              <i class="bi bi-journal-check text-primary me-1"></i> Algorithmic Evidence &amp; Explanation
+            </h6>
+            <p class="small text-dark mb-2">
+              {{ o.evidence_data.summary }}
+            </p>
+
+            <div class="row g-2 align-items-center mb-2">
+              <div class="col-auto small text-muted"><strong>Composite Breakdown:</strong></div>
+              <div class="col-auto">
+                <span class="badge bg-white text-dark border">Semantic: {{ (o.semantic_score * 100) | round(1) }}% (weight: 55%)</span>
+              </div>
+              <div class="col-auto">
+                <span class="badge bg-white text-dark border">Keywords: {{ (o.keyword_score * 100) | round(1) }}% (weight: 20%)</span>
+              </div>
+              <div class="col-auto">
+                <span class="badge bg-white text-dark border">Category: {{ (o.category_score * 100) | round(1) }}% (weight: 15%)</span>
+              </div>
+              <div class="col-auto">
+                <span class="badge bg-white text-dark border">Context: {{ (o.context_score * 100) | round(1) }}% (weight: 10%)</span>
+              </div>
+            </div>
+
+            {% if o.evidence_data.shared_keywords %}
+              <div class="mb-1">
+                <span class="small text-muted me-1">Shared Key Terms:</span>
+                {% for kw in o.evidence_data.shared_keywords %}
+                  <span class="badge bg-secondary">{{ kw }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            {% if o.conflicting_evidence %}
+              <div class="small text-danger mt-2">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                <strong>Contradictory Signal Detected:</strong> {{ o.conflicting_evidence }}
+              </div>
+            {% endif %}
+
+            {% if o.review_notes %}
+              <div class="small bg-white p-2 rounded border mt-2">
+                <strong>Review Decision by {{ o.reviewer.display_name if o.reviewer else 'Reviewer' }} ({{ o.reviewed_at.strftime('%d %b %Y, %H:%M') if o.reviewed_at else '' }}):</strong>
+                <p class="mb-0 text-secondary">{{ o.review_notes }}</p>
+              </div>
+            {% endif %}
+          </div>
+
+          <!-- Human Review Action Bar -->
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 pt-2 border-top">
+            <div class="small text-muted">
+              Current Review State: <strong>{{ o.review_status }}</strong>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+              <!-- Confirm Related Form -->
+              {% if o.review_status != 'Confirmed Related' %}
+                <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#confirmModal{{ o.id }}">
+                  <i class="bi bi-check-circle me-1"></i> Confirm Related
+                </button>
+              {% endif %}
+
+              <!-- Mark Not Related Form -->
+              {% if o.review_status != 'Rejected Not Related' %}
+                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ o.id }}">
+                  <i class="bi bi-x-circle me-1"></i> Mark Not Related
+                </button>
+              {% endif %}
+
+              <!-- Return to Pending -->
+              {% if o.review_status != 'Pending Review' %}
+                <form method="POST" action="{{ url_for('overlaps.review_action', overlap_id=o.id) }}" class="d-inline">
+                  <input type="hidden" name="action" value="reset">
+                  <button type="submit" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i> Return to Pending
+                  </button>
+                </form>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Confirm Related -->
+      <div class="modal fade" id="confirmModal{{ o.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <form method="POST" action="{{ url_for('overlaps.review_action', overlap_id=o.id) }}">
+              <input type="hidden" name="action" value="confirm">
+              <div class="modal-header">
+                <h5 class="modal-title fw-bold">Confirm Duplicate / Related Complaints</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <p class="small text-dark">
+                  You are confirming that <strong>{{ o.first_complaint.reference_number }}</strong> and <strong>{{ o.second_complaint.reference_number }}</strong> describe the same underlying incident or problem.
+                </p>
+                <div class="alert alert-info small py-2 mb-3">
+                  <i class="bi bi-info-circle me-1"></i>
+                  <strong>Policy:</strong> Confirming a relationship will link these complaints for synchronized monitoring, but will NOT automatically merge or delete either record.
+                </div>
+                <div class="mb-3">
+                  <label class="form-label small fw-semibold">Reviewer Notes (Optional)</label>
+                  <textarea name="review_notes" class="form-control form-control-sm" rows="3" placeholder="e.g. Verified both complaints describe testing equipment breakdown in the 3rd-floor mechanical lab..."></textarea>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-success btn-sm">Confirm Linkage</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal: Mark Not Related -->
+      <div class="modal fade" id="rejectModal{{ o.id }}" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <form method="POST" action="{{ url_for('overlaps.review_action', overlap_id=o.id) }}">
+              <input type="hidden" name="action" value="reject">
+              <div class="modal-header">
+                <h5 class="modal-title fw-bold">Mark Complaints as Not Related</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+              </div>
+              <div class="modal-body">
+                <p class="small text-dark">
+                  Confirm that <strong>{{ o.first_complaint.reference_number }}</strong> and <strong>{{ o.second_complaint.reference_number }}</strong> are distinct grievances and should NOT be linked.
+                </p>
+                <div class="mb-3">
+                  <label class="form-label small fw-semibold">Reason / Investigation Note</label>
+                  <textarea name="review_notes" class="form-control form-control-sm" rows="3" placeholder="e.g. Verified these refer to two different laboratories/facilities..."></textarea>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-danger btn-sm">Mark Not Related</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="gov-card">
+    <div class="gov-card-body p-5 text-center text-muted">
+      <i class="bi bi-check-circle-fill text-success fs-1 d-block mb-3"></i>
+      <h5 class="fw-bold text-dark">No Overlaps in this Queue</h5>
+      <p class="small text-muted mb-0">No complaint pairs found matching the selected status or filters.</p>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

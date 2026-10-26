@@ -1,0 +1,52 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 1200 >>
+stream
+BT
+/F1 18 Tf
+50 720 Td
+(AICTE STATUTORY GRIEVANCE EVIDENCE DOCUMENT) Tj
+/F1 11 Tf
+0 -30 Td
+(Document Type: Certified Fee Receipt & Tuition Demand Note) Tj
+0 -18 Td
+(Verification Status: Digitally Authenticated by SIH-SENTRIX Security Vault) Tj
+0 -18 Td
+(Issuing Body: Department of Accounts, Dayananda Sagar College of Engineering) Tj
+0 -18 Td
+(Complainant: Priya Nair \(USN: 1DS22CS089\)) Tj
+0 -18 Td
+(Amount Demanded: INR 85,000 \(Alleged Capitation / Excess Fee\)) Tj
+0 -18 Td
+(Security Hash: SHA256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069) Tj
+0 -18 Td
+(Notice: This evidence is confidential and restricted to the Assigned Bureau and Central Admin.) Tj
+0 -18 Td
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000010 00000 n 
+0000000060 00000 n 
+0000000117 00000 n 
+0000000224 00000 n 
+0000000800 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+900
+%%EOF

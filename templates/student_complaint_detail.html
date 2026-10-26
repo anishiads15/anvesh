@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+
+{% block title %}Track Grievance {{ complaint.reference_number }} — ANVESH AICTE Platform{% endblock %}
+
+{% block extra_head %}
+<style>
+  .stepper-wrapper {
+    display: flex;
+    justify-content: space-between;
+    position: relative;
+    margin-bottom: 2rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+  .stepper-wrapper::before {
+    content: "";
+    position: absolute;
+    top: 20px;
+    left: 25px;
+    right: 25px;
+    height: 3px;
+    background: #e2e8f0;
+    z-index: 1;
+  }
+  .stepper-step {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 16%;
+    min-width: 95px;
+    text-align: center;
+  }
+  .stepper-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    color: #64748b;
+    border: 2px solid #cbd5e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    transition: all 0.3s;
+  }
+  .stepper-step.completed .stepper-circle {
+    background: #198754;
+    border-color: #198754;
+    color: white;
+  }
+  .stepper-step.active .stepper-circle {
+    background: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+    box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.25);
+  }
+  .stepper-step.escalated .stepper-circle {
+    background: #dc3545;
+    border-color: #dc3545;
+    color: white;
+    box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.25);
+  }
+  .stepper-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    color: #475569;
+  }
+  .stepper-step.active .stepper-title {
+    color: #0d6efd;
+  }
+  .stepper-step.escalated .stepper-title {
+    color: #dc3545;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb and Top Banner -->
+<div class="mb-4">
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <a href="{{ url_for('complaints.student_portal') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i> Back to My Grievances
+    </a>
+    <span class="badge bg-primary bg-opacity-10 text-primary">Student Grievance Tracking Dossier</span>
+  </div>
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div>
+      <div class="d-flex align-items-center gap-2">
+        <h3 class="fw-bold text-dark mb-0">{{ complaint.reference_number }}</h3>
+        <button type="button" class="btn-copy-chip" data-copy-text="{{ complaint.reference_number }}" title="Copy Reference ID" aria-label="Copy Reference ID">
+          <i class="bi bi-clipboard"></i> Copy
+        </button>
+      </div>
+      <p class="text-muted small mb-0">Registered on {{ complaint.created_at | format_datetime }}</p>
+    </div>
+    <div>
+      {% if complaint.status in ['Resolved', 'Closed'] %}
+        <span class="badge bg-success fs-6 px-3 py-2"><i class="bi bi-check-circle me-1"></i>Status: Resolved</span>
+      {% elif complaint.status in ['Escalated', 'Escalated to AICTE'] %}
+        <span class="badge bg-danger fs-6 px-3 py-2"><i class="bi bi-shield-fill-exclamation me-1"></i>Status: Escalated to AICTE</span>
+      {% elif complaint.status == 'Under Investigation' %}
+        <span class="badge bg-info text-dark fs-6 px-3 py-2"><i class="bi bi-search me-1"></i>Status: Under Investigation</span>
+      {% elif complaint.status in ['Under Review', 'Under Institutional Review'] %}
+        <span class="badge bg-warning text-dark fs-6 px-3 py-2"><i class="bi bi-hourglass-split me-1"></i>Status: Under Institutional Review</span>
+      {% elif complaint.status == 'Reopened' %}
+        <span class="badge bg-secondary fs-6 px-3 py-2"><i class="bi bi-arrow-repeat me-1"></i>Status: Reopened</span>
+      {% else %}
+        <span class="badge bg-primary fs-6 px-3 py-2"><i class="bi bi-send me-1"></i>Status: Submitted</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- 6-STAGE PROGRESS STEPPER -->
+<div class="gov-card mb-4 p-4">
+  <h6 class="fw-bold text-dark mb-3"><i class="bi bi-bezier2 me-2 text-primary"></i>6-Stage Lifecycle Resolution Pathway</h6>
+  
+  {# Determine progress state #}
+  {% set s = complaint.status %}
+  {% set is_submitted = true %}
+  {% set is_review = s in ['Under Review', 'Under Institutional Review', 'Escalated', 'Escalated to AICTE', 'Under Investigation', 'Returned for Action', 'Resolved', 'Closed', 'Reopened'] %}
+  {% set is_escalated = s in ['Escalated', 'Escalated to AICTE', 'Under Investigation', 'Returned for Action'] or (complaint.escalation_reason) %}
+  {% set is_investigation = s in ['Under Investigation', 'Returned for Action'] %}
+  {% set is_resolved = s in ['Resolved', 'Closed'] or complaint.resolution_date %}
+  {% set is_closed_or_reopened = s in ['Closed', 'Reopened'] or (is_resolved and complaint.feedback_rating) %}
+
+  <div class="stepper-wrapper">
+    <!-- Stage 1: Submitted -->
+    <div class="stepper-step completed">
+      <div class="stepper-circle"><i class="bi bi-check-lg"></i></div>
+      <div class="stepper-title">1. Submitted</div>
+      <div class="small text-muted" style="font-size: 0.65rem;">Recorded</div>
+    </div>
+
+    <!-- Stage 2: Institutional Review -->
+    <div class="stepper-step {% if is_escalated or is_investigation or is_resolved or s in ['Closed', 'Reopened'] %}completed{% elif s in ['Under Review', 'Under Institutional Review'] %}active{% endif %}">
+      <div class="stepper-circle">
+        {% if is_escalated or is_investigation or is_resolved or s in ['Closed', 'Reopened'] %}
+          <i class="bi bi-check-lg"></i>
+        {% elif s in ['Under Review', 'Under Institutional Review'] %}
+          <i class="bi bi-hourglass-split"></i>
+        {% else %}
+          2
+        {% endif %}
+      </div>
+      <div class="stepper-title">2. Institutional Review</div>
+      <div class="small text-muted" style="font-size: 0.65rem;">Initial Assessment</div>
+    </div>
+
+    <!-- Stage 3: AICTE Escalation -->
+    <div class="stepper-step {% if is_investigation or (is_resolved and complaint.escalation_reason) %}completed{% elif s in ['Escalated', 'Escalated to AICTE'] %}escalated{% elif is_escalated %}completed{% elif is_resolved %}completed{% endif %}">
+      <div class="stepper-circle">
+        {% if is_investigation or (is_resolved and complaint.escalation_reason) %}
+          <i class="bi bi-check-lg"></i>
+        {% elif s in ['Escalated', 'Escalated to AICTE'] %}
+          <i class="bi bi-shield-fill-exclamation"></i>
+        {% elif is_resolved %}
+          <i class="bi bi-check-lg text-success"></i>
+        {% else %}
+          3
+        {% endif %}
+      </div>
+      <div class="stepper-title">3. AICTE Escalation</div>
+      <div class="small text-muted" style="font-size: 0.65rem;">
+        {% if is_resolved and not complaint.escalation_reason %}Institutional Tier Resolution{% else %}Regulatory Review{% endif %}
+      </div>
+    </div>
+
+    <!-- Stage 4: Investigation -->
+    <div class="stepper-step {% if is_resolved and not is_investigation %}completed{% elif s == 'Under Investigation' %}active{% endif %}">
+      <div class="stepper-circle">
+        {% if is_resolved and not is_investigation %}
+          <i class="bi bi-check-lg"></i>
+        {% elif s == 'Under Investigation' %}
+          <i class="bi bi-search"></i>
+        {% else %}
+          4
+        {% endif %}
+      </div>
+      <div class="stepper-title">4. Investigation</div>
+      <div class="small text-muted" style="font-size: 0.65rem;">Inquiry &amp; Directives</div>
+    </div>
+
+    <!-- Stage 5: Resolution Decision -->
+    <div class="stepper-step {% if is_closed_or_reopened or s == 'Resolved' %}completed{% elif is_resolved %}active{% endif %}">
+      <div class="stepper-circle">
+        {% if is_resolved %}
+          <i class="bi bi-check2-all"></i>
+        {% else %}
+          5
+        {% endif %}
+      </div>
+      <div class="stepper-title">5. Resolution Decision</div>
+      <div class="small text-muted" style="font-size: 0.65rem;">Official Redressal</div>
+    </div>
+
+    <!-- Stage 6: Closed or Reopened -->
+    <div class="stepper-step {% if s == 'Reopened' %}escalated{% elif s == 'Closed' or (is_resolved and complaint.feedback_rating) %}completed{% elif is_resolved %}active{% endif %}">
+      <div class="stepper-circle">
+        {% if s == 'Reopened' %}
+          <i class="bi bi-arrow-repeat"></i>
+        {% elif s == 'Closed' or (is_resolved and complaint.feedback_rating) %}
+          <i class="bi bi-check-circle-fill"></i>
+        {% elif is_resolved %}
+          <i class="bi bi-star-half"></i>
+        {% else %}
+          6
+        {% endif %}
+      </div>
+      <div class="stepper-title">6. Closed / Feedback</div>
+      <div class="small text-muted" style="font-size: 0.65rem;">
+        {% if s == 'Reopened' %}Reopened For Review{% elif complaint.feedback_rating %}Feedback Received{% elif is_resolved %}Awaiting Feedback{% else %}Final Outcome{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Current Responsible Authority & Department Routing Card -->
+<div class="gov-card mb-4 border-2 shadow-sm">
+  <div class="gov-card-header bg-light d-flex justify-content-between align-items-center">
+    <h6 class="gov-card-title mb-0">
+      <i class="bi bi-building-check text-primary me-2"></i>Responsible Authority &amp; Routing
+    </h6>
+    <span class="badge bg-primary px-2 py-1">
+      {{ complaint.routed_destination or complaint.suggested_destination or 'Under Institutional Review' }}
+    </span>
+  </div>
+  <div class="gov-card-body">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <span class="small text-muted d-block">Current Handling Authority:</span>
+        <span class="fw-bold text-dark fs-6">
+          {% if complaint.routed_destination == 'PGRC' or (not complaint.routed_destination and complaint.suggested_destination == 'PGRC') %}
+            <i class="bi bi-people-fill text-primary me-1"></i>Public Grievance Redressal Committee (PGRC)
+          {% elif complaint.routed_destination == 'RC' or (not complaint.routed_destination and complaint.suggested_destination == 'RC') %}
+            <i class="bi bi-shield-check text-danger me-1"></i>Regional Committee (RC) Compliance Cell
+          {% elif complaint.routed_destination == 'Institutional Reviewer' or (not complaint.routed_destination and complaint.suggested_destination == 'Institutional Reviewer') %}
+            <i class="bi bi-building text-warning me-1"></i>Institutional Review Committee ({{ complaint.institution.name }})
+          {% else %}
+            <i class="bi bi-journal-text text-secondary me-1"></i>Central Review &amp; Triage Authority
+          {% endif %}
+        </span>
+      </div>
+      <div class="col-md-6">
+        <span class="small text-muted d-block">Routing Status:</span>
+        {% if complaint.routed_destination %}
+          <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 mt-1">
+            <i class="bi bi-check-circle me-1"></i>Confirmed by Reviewer ({{ complaint.routing_decision or 'Verified' }})
+          </span>
+        {% else %}
+          <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 mt-1">
+            <i class="bi bi-cpu me-1"></i>AI Routing Recommendation: {{ complaint.suggested_destination or 'Under Review' }} (Awaiting Reviewer Sign-off)
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if complaint.related_group %}
+      <!-- Shared Issue Docket Notification (Section 3 & 6) -->
+      <div class="alert alert-info border-2 mt-3 mb-0 d-flex align-items-center gap-3">
+        <i class="bi bi-diagram-3-fill fs-3 text-info"></i>
+        <div>
+          <div class="fw-bold text-dark">Linked to Shared Master Issue Docket: <code>{{ complaint.related_group.group_reference }}</code></div>
+          <div class="small text-secondary">
+            This grievance has been connected to a recognized shared issue regarding <strong>{{ complaint.related_group.title }}</strong>. The institution and AICTE are resolving the underlying condition collectively.
+          </div>
+          <div class="small text-muted mt-1" style="font-size: 0.72rem;">
+            <i class="bi bi-shield-lock me-1"></i>Your personal identity and individual complaint docket remain strictly confidential and independent.
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Left Column: Grievance Content & Public Resolution Statement -->
+  <div class="col-lg-8">
+    <!-- Public Resolution Card (if resolved) -->
+    {% if complaint.public_resolution_statement or complaint.resolution_notes %}
+      <div class="card border-success shadow-sm mb-4">
+        <div class="card-header bg-success text-white py-2">
+          <h6 class="mb-0 fw-bold"><i class="bi bi-patch-check-fill me-2"></i>Official Public Resolution Statement</h6>
+        </div>
+        <div class="card-body bg-success bg-opacity-10 text-dark">
+          <p class="mb-2 fs-6" style="line-height: 1.6;">
+            {{ complaint.public_resolution_statement or complaint.resolution_notes }}
+          </p>
+          <div class="small text-muted">
+            <i class="bi bi-calendar-check me-1"></i>Resolved on: <strong>{{ complaint.resolution_date.strftime('%d %B %Y') if complaint.resolution_date else 'Recent' }}</strong>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Grievance Statement Details -->
+    <div class="gov-card mb-4">
+      <div class="gov-card-header d-flex justify-content-between align-items-center">
+        <h6 class="gov-card-title mb-0"><i class="bi bi-text-paragraph me-2 text-primary"></i>Grievance Statement</h6>
+        <span class="badge bg-light text-dark border">{{ complaint.category }}</span>
+      </div>
+      <div class="gov-card-body">
+        <h5 class="fw-bold text-dark mb-3">{{ complaint.title }}</h5>
+
+        <!-- Confidentiality Badge -->
+        <div class="p-2 mb-3 bg-light border rounded d-flex align-items-center gap-2 small">
+          <i class="bi bi-shield-check text-success fs-5"></i>
+          <div>
+            <strong class="text-dark">Identity Protected:</strong>
+            {% if complaint.is_confidential %}
+              <span class="text-secondary">Filed under strict AICTE confidential grievance guidelines. Your personal details are guarded from institution staff.</span>
+            {% else %}
+              <span class="text-secondary">Filed as {{ complaint.complainant_name or 'Complainant' }}.</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="p-3 bg-light rounded border text-dark mb-3" style="white-space: pre-wrap; line-height: 1.6;">
+{{ complaint.description }}
+        </div>
+
+        {% if complaint.attachment_filename or complaint.supporting_reference %}
+          <div class="p-2 bg-white rounded border small text-muted d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div>
+              <i class="bi bi-paperclip text-primary me-1"></i>
+              <strong>Attached Reference / File:</strong> <code>{{ complaint.attachment_filename or complaint.supporting_reference }}</code>
+            </div>
+            {% if complaint.attachment_filename %}
+              <a href="{{ url_for('complaints.view_evidence', complaint_id=complaint.id, filename=complaint.attachment_filename) }}" target="_blank" class="btn btn-xs btn-outline-primary py-0 px-2 fw-semibold">
+                <i class="bi bi-box-arrow-up-right me-1"></i> View / Download
+              </a>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        <!-- Evidence Upload Form -->
+        <div class="p-3 bg-light rounded border mb-3">
+          <div class="fw-semibold small text-dark mb-2"><i class="bi bi-cloud-arrow-up text-primary me-1"></i> Upload Supporting Evidence Document</div>
+          <form method="POST" action="{{ url_for('complaints.upload_evidence', complaint_id=complaint.id) }}" enctype="multipart/form-data" class="d-flex flex-wrap align-items-center gap-2">
+            <input type="file" name="evidence_file" class="form-control form-control-sm" style="max-width: 320px;" accept=".pdf,.doc,.docx" required>
+            <button type="submit" class="btn btn-sm btn-gov-primary py-1 px-3">Upload Document</button>
+            <span class="small text-muted" style="font-size: 0.72rem;">(PDF, DOC, DOCX up to 5MB)</span>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Public Activity & Milestone Updates (NO internal notes) -->
+    <div class="gov-card mb-4">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title mb-0"><i class="bi bi-clock-history me-2 text-primary"></i>Official Progress Updates</h6>
+      </div>
+      <div class="gov-card-body">
+        {% if complaint.status_history %}
+          <div class="timeline">
+            {% for item in complaint.status_history %}
+              <div class="timeline-item">
+                <div class="timeline-marker"></div>
+                <div class="fw-bold text-dark">
+                  Stage Updated: <span class="badge bg-light text-dark border">{{ item.new_status }}</span>
+                </div>
+                <div class="small text-muted">{{ item.timestamp.strftime('%d %b %Y, %H:%M UTC') }}</div>
+                {% if item.notes and 'Grievance' in item.notes or 'Initial' in item.notes or 'Resolved' in item.notes or 'Escalated' in item.notes %}
+                  <div class="small text-secondary mt-1">{{ item.notes }}</div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="text-muted small">No updates logged yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column: Institution Info & Complainant Actions -->
+  <div class="col-lg-4">
+    <!-- Institution Card -->
+    <div class="gov-card mb-4">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title mb-0"><i class="bi bi-building me-2 text-primary"></i>Institution Lodged Against</h6>
+      </div>
+      <div class="gov-card-body">
+        <h6 class="fw-bold text-dark mb-1">{{ complaint.institution.name if complaint.institution else 'AICTE Registered College' }}</h6>
+        <div class="small text-muted mb-2">Code: <code>{{ complaint.institution.code if complaint.institution else 'N/A' }}</code></div>
+        <div class="small text-muted mb-1"><i class="bi bi-geo-alt me-1"></i>{{ complaint.institution.district }}, {{ complaint.institution.state }}</div>
+        <div class="small text-muted"><i class="bi bi-mortarboard me-1"></i>{{ complaint.institution.institution_type }}</div>
+      </div>
+    </div>
+
+    <!-- Complainant Action: Feedback Rating (if resolved) -->
+    {% if complaint.status in ['Resolved', 'Closed'] %}
+      <div class="gov-card mb-4 border-success">
+        <div class="gov-card-header bg-success bg-opacity-10">
+          <h6 class="gov-card-title mb-0 text-success"><i class="bi bi-star-fill me-2"></i>Resolution Feedback</h6>
+        </div>
+        <div class="gov-card-body">
+          {% if complaint.feedback_rating %}
+            <div class="alert alert-light border mb-0">
+              <div class="fw-bold text-dark small mb-1">Your Submitted Rating:</div>
+              <div class="text-warning fs-5 mb-1">
+                {% for i in range(complaint.feedback_rating) %}&#9733;{% endfor %}
+                {% for i in range(5 - complaint.feedback_rating) %}&#9734;{% endfor %}
+              </div>
+              {% if complaint.feedback_notes %}
+                <div class="small text-muted fst-italic">"{{ complaint.feedback_notes }}"</div>
+              {% endif %}
+            </div>
+          {% else %}
+            <form method="POST" action="{{ url_for('complaints.student_feedback', complaint_id=complaint.id) }}">
+              <p class="small text-muted mb-2">Are you satisfied with how the institution resolved your grievance?</p>
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Satisfaction Rating</label>
+                <select name="feedback_rating" class="form-select form-select-sm" required>
+                  <option value="5">5 - Fully Satisfied / Issue Resolved</option>
+                  <option value="4">4 - Mostly Satisfied</option>
+                  <option value="3">3 - Neutral / Partial Resolution</option>
+                  <option value="2">2 - Dissatisfied</option>
+                  <option value="1">1 - Highly Dissatisfied</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Optional Comments</label>
+                <textarea name="feedback_notes" class="form-control form-control-sm" rows="2" placeholder="Tell us if further action is needed..."></textarea>
+              </div>
+              <button type="submit" class="btn btn-sm btn-success w-100 fw-semibold">Submit Resolution Feedback</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Complainant Action: Reopen Grievance -->
+      <div class="gov-card">
+        <div class="gov-card-header">
+          <h6 class="gov-card-title mb-0"><i class="bi bi-arrow-repeat me-2 text-warning"></i>Dissatisfied with Resolution?</h6>
+        </div>
+        <div class="gov-card-body">
+          <p class="small text-muted mb-3">If the problem has persisted, recurred, or was not satisfactorily addressed, you may request to reopen this grievance for higher AICTE review.</p>
+          <button type="button" class="btn btn-sm btn-outline-danger w-100 fw-semibold" data-bs-toggle="modal" data-bs-target="#reopenModal">
+            <i class="bi bi-arrow-repeat me-1"></i> Request to Reopen Grievance
+          </button>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal: Reopen Grievance -->
+<div class="modal fade" id="reopenModal" tabindex="-1" aria-labelledby="reopenModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="POST" action="{{ url_for('complaints.student_reopen', complaint_id=complaint.id) }}">
+        <div class="modal-header">
+          <h5 class="modal-title fw-bold" id="reopenModalLabel">Request to Reopen Grievance</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted">
+            Please explain why this grievance requires reopening (e.g. equipment broken again, promised fee refund not credited, recurring harassment).
+          </p>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Reason for Reopening</label>
+            <textarea name="reopen_reason" class="form-control" rows="3" placeholder="Provide factual details on why the previous resolution was inadequate..." required></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger btn-sm">Confirm Reopen Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

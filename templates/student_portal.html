@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}My Grievance Portal — AICTE Student Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between mb-4 gap-3">
+  <div>
+    <span class="badge bg-primary bg-opacity-10 text-primary mb-1">Complainant / Student Services</span>
+    <h4 class="fw-bold mb-1 text-dark">My Registered Complaints &amp; Grievances</h4>
+    <p class="text-muted small mb-0">Track real-time progress, institutional reviews, and official AICTE resolution statements.</p>
+  </div>
+  <div>
+    <a href="{{ url_for('complaints.create') }}" class="btn btn-gov-primary btn-sm">
+      <i class="bi bi-plus-lg me-1"></i> Register New Grievance
+    </a>
+  </div>
+</div>
+
+<!-- Metrics summary cards -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-sm-6">
+    <div class="gov-card p-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <div class="text-muted small text-uppercase fw-semibold" style="font-size: 0.72rem;">Total Grievances</div>
+          <h3 class="fw-bold text-dark mb-0">{{ complaints | length }}</h3>
+        </div>
+        <div class="p-2 rounded bg-primary bg-opacity-10 text-primary">
+          <i class="bi bi-journal-text fs-4"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-3 col-sm-6">
+    <div class="gov-card p-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <div class="text-muted small text-uppercase fw-semibold" style="font-size: 0.72rem;">Under Review</div>
+          <h3 class="fw-bold text-warning mb-0">
+            {{ complaints | selectattr('status', 'in', ['Submitted', 'Open', 'Under Review', 'Under Institutional Review', 'Pending']) | list | length }}
+          </h3>
+        </div>
+        <div class="p-2 rounded bg-warning bg-opacity-10 text-warning">
+          <i class="bi bi-hourglass-split fs-4"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-3 col-sm-6">
+    <div class="gov-card p-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <div class="text-muted small text-uppercase fw-semibold" style="font-size: 0.72rem;">Escalated to AICTE</div>
+          <h3 class="fw-bold text-danger mb-0">
+            {{ complaints | selectattr('status', 'in', ['Escalated', 'Escalated to AICTE', 'Under Investigation']) | list | length }}
+          </h3>
+        </div>
+        <div class="p-2 rounded bg-danger bg-opacity-10 text-danger">
+          <i class="bi bi-shield-fill-exclamation fs-4"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-3 col-sm-6">
+    <div class="gov-card p-3">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <div class="text-muted small text-uppercase fw-semibold" style="font-size: 0.72rem;">Resolved</div>
+          <h3 class="fw-bold text-success mb-0">
+            {{ complaints | selectattr('status', 'in', ['Resolved', 'Closed']) | list | length }}
+          </h3>
+        </div>
+        <div class="p-2 rounded bg-success bg-opacity-10 text-success">
+          <i class="bi bi-check-circle fs-4"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Complaints List -->
+<div class="gov-card">
+  <div class="gov-card-header d-flex justify-content-between align-items-center">
+    <h6 class="gov-card-title mb-0"><i class="bi bi-list-task me-2 text-primary"></i>My Submitted Grievance Dossiers</h6>
+    <span class="badge bg-light text-dark border">{{ complaints | length }} Records</span>
+  </div>
+  <div class="gov-card-body p-0">
+    {% if complaints %}
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr class="small text-muted text-uppercase" style="font-size: 0.75rem;">
+              <th>Reference</th>
+              <th>Institution</th>
+              <th>Category &amp; Title</th>
+              <th>Priority</th>
+              <th>Current Stage</th>
+              <th>Submitted Date</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in complaints %}
+              <tr>
+                <td>
+                  <a href="{{ url_for('complaints.student_detail', complaint_id=c.id) }}" class="fw-bold text-primary text-decoration-none">
+                    {{ c.reference_number }}
+                  </a>
+                  {% if c.is_confidential %}
+                    <span class="badge bg-secondary" title="Confidential Complainant Identity"><i class="bi bi-shield-lock"></i></span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="small fw-semibold text-dark">{{ c.institution.name if c.institution else 'N/A' }}</div>
+                  <div class="text-muted" style="font-size: 0.72rem;">{{ c.institution.code if c.institution else '' }}</div>
+                </td>
+                <td>
+                  <div class="small fw-bold text-dark">{{ c.title }}</div>
+                  <span class="badge bg-light text-secondary border mt-1" style="font-size: 0.72rem;">{{ c.category }}</span>
+                </td>
+                <td>
+                  {% if c.priority == 'Critical' %}
+                    <span class="badge badge-priority-critical px-2 py-1">Critical</span>
+                  {% elif c.priority == 'High' %}
+                    <span class="badge badge-priority-high px-2 py-1">High</span>
+                  {% elif c.priority == 'Medium' %}
+                    <span class="badge badge-priority-medium px-2 py-1">Medium</span>
+                  {% else %}
+                    <span class="badge badge-priority-low px-2 py-1">Low</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if c.status in ['Resolved', 'Closed'] %}
+                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Resolved</span>
+                  {% elif c.status in ['Escalated', 'Escalated to AICTE'] %}
+                    <span class="badge bg-danger"><i class="bi bi-arrow-up-right-circle me-1"></i>Escalated to AICTE</span>
+                  {% elif c.status == 'Under Investigation' %}
+                    <span class="badge bg-info text-dark"><i class="bi bi-search me-1"></i>Under Investigation</span>
+                  {% elif c.status in ['Under Review', 'Under Institutional Review'] %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i>Institutional Review</span>
+                  {% elif c.status == 'Reopened' %}
+                    <span class="badge bg-secondary"><i class="bi bi-arrow-repeat me-1"></i>Reopened</span>
+                  {% else %}
+                    <span class="badge bg-primary"><i class="bi bi-send me-1"></i>Submitted</span>
+                  {% endif %}
+                </td>
+                <td class="small text-muted">
+                  {{ c.created_at.strftime('%d %b %Y') if c.created_at else '' }}
+                </td>
+                <td class="text-end">
+                  <a href="{{ url_for('complaints.student_detail', complaint_id=c.id) }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-eye me-1"></i> Track Grievance
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-center py-5">
+        <div class="d-inline-flex p-3 rounded-circle bg-light text-muted mb-3">
+          <i class="bi bi-journal-plus fs-1"></i>
+        </div>
+        <h6 class="fw-bold text-dark">No Grievances Registered Yet</h6>
+        <p class="small text-muted mb-3">You have not submitted any complaints through the student portal.</p>
+        <a href="{{ url_for('complaints.create') }}" class="btn btn-gov-primary btn-sm">
+          <i class="bi bi-plus-lg me-1"></i> File a Complaint
+        </a>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

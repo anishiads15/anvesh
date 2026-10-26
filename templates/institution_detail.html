@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block title %}{{ institution.name }} — AICTE Monitoring Portal{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <div class="d-flex align-items-center gap-2 mb-1">
+    <a href="{{ url_for('institutions.index') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Institutions Directory</a>
+    <h4 class="fw-bold mb-0 text-dark">{{ institution.name }}</h4>
+    <span class="badge bg-light text-dark border">AICTE Code: {{ institution.code }}</span>
+  </div>
+  <p class="text-muted small mb-0">{{ institution.institution_type }} &bull; {{ institution.district }}, {{ institution.state }}</p>
+</div>
+
+<!-- Institution Metrics -->
+<div class="row g-3 mb-4">
+  <div class="col-md-2 col-sm-4">
+    <div class="stat-card">
+      <div>
+        <div class="stat-value text-primary">{{ complaints | length }}</div>
+        <div class="stat-label">Total Grievances</div>
+      </div>
+      <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-archive"></i></div>
+    </div>
+  </div>
+
+  <div class="col-md-2 col-sm-4">
+    <div class="stat-card">
+      <div>
+        <div class="stat-value text-warning">{{ open_count }}</div>
+        <div class="stat-label">Under Review</div>
+      </div>
+      <div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-hourglass-split"></i></div>
+    </div>
+  </div>
+
+  <div class="col-md-3 col-sm-4">
+    <div class="stat-card">
+      <div>
+        <div class="stat-value text-danger">{{ overdue_count }}</div>
+        <div class="stat-label">Statutorily Overdue (>30d)</div>
+      </div>
+      <div class="stat-icon bg-danger bg-opacity-10 text-danger"><i class="bi bi-alarm"></i></div>
+    </div>
+  </div>
+
+  <div class="col-md-2 col-sm-6">
+    <div class="stat-card">
+      <div>
+        <div class="stat-value text-success">{{ resolved_count }}</div>
+        <div class="stat-label">Resolved / Closed</div>
+      </div>
+      <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="bi bi-check2-circle"></i></div>
+    </div>
+  </div>
+
+  <div class="col-md-3 col-sm-6">
+    <div class="stat-card">
+      <div>
+        <div class="stat-value text-info">{{ pending_overlaps_count }}</div>
+        <div class="stat-label">Overlap Relationships</div>
+      </div>
+      <div class="stat-icon bg-info bg-opacity-10 text-info"><i class="bi bi-diagram-3"></i></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
+  <!-- Complaints Table for this institution -->
+  <div class="col-lg-8">
+    <div class="gov-card">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title"><i class="bi bi-journal-text me-2 text-primary"></i>Grievances Registered for this Institution</h6>
+      </div>
+      <div class="gov-card-body p-0">
+        {% if complaints %}
+          <div class="table-responsive">
+            <table class="gov-table mb-0">
+              <thead>
+                <tr>
+                  <th>Reference &amp; Date</th>
+                  <th>Title &amp; Overlap State</th>
+                  <th>Category</th>
+                  <th>Status</th>
+                  <th class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for c in complaints %}
+                  <tr class="{% if c.highest_overlap_badge == 'STRONG_POTENTIAL' %}overlap-strong-highlight{% elif c.highest_overlap_badge == 'POSSIBLE_OVERLAP' %}overlap-possible-highlight{% endif %}">
+                    <td>
+                      <a href="{{ url_for('complaints.detail', complaint_id=c.id) }}" class="fw-bold text-dark text-decoration-none">
+                        {{ c.reference_number }}
+                      </a>
+                      <div class="small text-muted">{{ c.created_at.strftime('%d %b %Y') if c.created_at else '' }}</div>
+                    </td>
+                    <td>
+                      <div class="fw-semibold text-dark mb-1">{{ c.title }}</div>
+                      {% if c.highest_overlap_badge == 'STRONG_POTENTIAL' %}
+                        <span class="badge-strong-overlap">STRONG POTENTIAL OVERLAP</span>
+                      {% elif c.highest_overlap_badge == 'POSSIBLE_OVERLAP' %}
+                        <span class="badge-possible-overlap">POSSIBLE OVERLAP</span>
+                      {% elif c.highest_overlap_badge == 'CONFIRMED_RELATED' %}
+                        <span class="badge-confirmed-related">CONFIRMED RELATED</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <span class="badge bg-light text-dark border">{{ c.category }}</span>
+                    </td>
+                    <td>
+                      {% if c.status == 'Open' %}
+                        <span class="badge badge-status-open">Open</span>
+                      {% elif c.status == 'Resolved' %}
+                        <span class="badge badge-status-resolved">Resolved</span>
+                      {% else %}
+                        <span class="badge bg-secondary">{{ c.status }}</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <a href="{{ url_for('complaints.detail', complaint_id=c.id) }}" class="btn btn-sm btn-outline-primary py-0 px-2">
+                        Inspect
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="p-4 text-center text-muted">No complaints recorded for this institution.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Institution Profile / Contacts -->
+  <div class="col-lg-4">
+    <div class="gov-card mb-4">
+      <div class="gov-card-header">
+        <h6 class="gov-card-title"><i class="bi bi-info-circle me-2 text-primary"></i>Campus Details</h6>
+      </div>
+      <div class="gov-card-body">
+        <div class="mb-3">
+          <span class="small text-muted d-block">Authorized Contact Person:</span>
+          <span class="fw-semibold text-dark">{{ institution.contact_person or 'Registrar Office' }}</span>
+        </div>
+        <div class="mb-3">
+          <span class="small text-muted d-block">Official Email:</span>
+          <span class="fw-semibold text-dark">{{ institution.contact_email or 'admin@institution.edu.in' }}</span>
+        </div>
+        <div class="mb-3">
+          <span class="small text-muted d-block">Phone:</span>
+          <span class="fw-semibold text-dark">{{ institution.contact_phone or '+91 (011) 2345-6789' }}</span>
+        </div>
+        <div class="mb-3">
+          <span class="small text-muted d-block">Geographic Locus:</span>
+          <span class="fw-semibold text-dark">{{ institution.district }}, {{ institution.state }}, India</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-secondary small">
+      <i class="bi bi-shield-check text-primary me-1"></i>
+      <strong>Independent Evaluation Rule:</strong> Multiple complaints filed for this institution are evaluated based on their semantic meaning, facility context, and keywords. Unrelated issues (e.g. drinking water vs lab machinery) are not linked simply because they share this institution.
+    </div>
+  </div>
+</div>
+{% endblock %}
