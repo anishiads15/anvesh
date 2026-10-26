@@ -6,3 +6,4 @@ python-dotenv>=1.0.0
 pytest>=8.0.0
 sentence-transformers>=3.0.0; extra == "ai"
 bcrypt
+bcrypt
